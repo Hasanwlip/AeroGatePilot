@@ -163,7 +163,7 @@ Third‑party components: [WinDivert](https://reqrypt.org/windivert.html) (packe
 
 ## Author
 
-**Hasanwlip** · Nodepilot  
+**Hasanwlip** · nodeflex  
 
 Full‑stack builder shipping practical Windows networking tools.  
 GitHub: [github.com/Hasanwlip](https://github.com/Hasanwlip)
@@ -174,7 +174,7 @@ If AeroGate Pilot helps your café, classroom, or lab — a star on the repo is 
 
 ## License
 
-[MIT](LICENSE) © 2026 Hasanwlip (Nodepilot)
+[MIT](LICENSE) © 2026 Hasanwlip (nodeflex)
 
 WinDivert, Xray-core, and fonts remain under their own licenses.
 
@@ -196,6 +196,6 @@ WinDivert, Xray-core, and fonts remain under their own licenses.
 هات‌اسپات + تعمیر خودکار ICS · پورتال سفارشی (لوگو/رنگ/CSS، انگلیسی و فارسی) · کاربران و پلن‌ها · لیست مسدود / فقط این لیست با `*.دامنه` · Xray داخلی یا پورت Clash · داشبورد و گزارش رویدادها.
 
 ### سازنده
-**Hasanwlip (Nodepilot)** — [github.com/Hasanwlip](https://github.com/Hasanwlip)
+**Hasanwlip (nodeflex)** — [github.com/Hasanwlip](https://github.com/Hasanwlip)
 
 مجوز: MIT
