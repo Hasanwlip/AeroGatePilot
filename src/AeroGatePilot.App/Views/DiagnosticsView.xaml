@@ -1,0 +1,70 @@
+<UserControl x:Class="AeroGatePilot.App.Views.DiagnosticsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:AeroGatePilot.App.Localization">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="32,0,32,32">
+        <StackPanel>
+            <DockPanel Margin="0,0,0,22">
+                <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Command="{Binding RunCommand}" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" VerticalAlignment="Center" />
+                        <TextBlock Text="{l:T Btn_RunChecks}" Margin="8,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <StackPanel>
+                    <TextBlock Text="{l:T Diag_Title}" Style="{StaticResource PageTitle}" />
+                    <TextBlock Text="{l:T Diag_Subtitle}" Style="{StaticResource PageSubtitle}" />
+                </StackPanel>
+            </DockPanel>
+
+            <Border Style="{StaticResource Card}">
+                <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Background="{StaticResource FieldBrush}" CornerRadius="14" Padding="16,12" Margin="0,0,0,10">
+                                <DockPanel>
+                                    <Border DockPanel.Dock="Left" Width="34" Height="34" CornerRadius="17" Margin="0,0,14,0" VerticalAlignment="Center"
+                                            Background="{Binding Status, Converter={StaticResource DiagBrush}}" Opacity="0.95">
+                                        <TextBlock Text="{Binding Status, Converter={StaticResource DiagGlyph}}" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                                   Foreground="#0B1020" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14" />
+                                        <TextBlock Text="{Binding Detail}" Foreground="{StaticResource MutedBrush}" FontSize="12.5" TextWrapping="Wrap" Margin="0,3,0,0" />
+                                    </StackPanel>
+                                </DockPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="{l:T Diag_DataFolder}" Style="{StaticResource CardTitle}" />
+                        <TextBlock Text="{Binding DataFolder}" FontFamily="{StaticResource MonoFont}" Foreground="{StaticResource MutedBrush}" FlowDirection="LeftToRight"
+                                   HorizontalAlignment="Left" TextWrapping="Wrap" />
+                        <Button Content="{l:T Btn_OpenFolder}" Command="{Binding OpenDataFolderCommand}" HorizontalAlignment="Left" Margin="0,14,0,0" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource Card}">
+                    <DockPanel>
+                        <Image DockPanel.Dock="Left" Source="pack://application:,,,/Assets/aerogate.png" Width="56" Height="56" Margin="0,0,16,0" VerticalAlignment="Top" />
+                        <StackPanel>
+                            <TextBlock FontSize="18" FontWeight="Bold" FlowDirection="LeftToRight" HorizontalAlignment="Left">
+                                <Run Text="AeroGate Pilot " /><Run Text="{Binding Version, Mode=OneWay}" Foreground="{StaticResource MutedBrush}" FontWeight="Normal" FontSize="13" />
+                            </TextBlock>
+                            <TextBlock Text="{l:T Diag_AboutText}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,6,0,0" LineHeight="22" />
+                        </StackPanel>
+                    </DockPanel>
+                </Border>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

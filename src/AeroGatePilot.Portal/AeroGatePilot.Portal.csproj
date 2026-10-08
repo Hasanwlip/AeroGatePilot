@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>AeroGatePilot.Portal</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AeroGatePilot.Core\AeroGatePilot.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Templates\**\*" LogicalName="Templates/%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\third_party\fonts\Vazirmatn-Regular.woff2" LogicalName="Templates/fonts/Vazirmatn-Regular.woff2" />
+    <EmbeddedResource Include="..\..\third_party\fonts\Vazirmatn-Bold.woff2" LogicalName="Templates/fonts/Vazirmatn-Bold.woff2" />
+  </ItemGroup>
+
+</Project>

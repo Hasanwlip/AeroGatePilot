@@ -1,0 +1,66 @@
+<UserControl x:Class="AeroGatePilot.App.Views.ActivityView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:AeroGatePilot.App.Localization">
+    <Grid Margin="32,0,32,32">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="16" />
+            <ColumnDefinition Width="1.6*" />
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Grid.ColumnSpan="3" Margin="0,0,0,22">
+            <TextBlock Text="{l:T Act_Title}" Style="{StaticResource PageTitle}" />
+            <TextBlock Text="{l:T Act_Subtitle}" Style="{StaticResource PageSubtitle}" />
+        </StackPanel>
+
+        <Border Grid.Row="1" Style="{StaticResource Card}">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="{l:T Act_Log}" Style="{StaticResource CardTitle}" />
+                <ListBox ItemsSource="{Binding Log}" Background="Transparent" Foreground="{StaticResource TextBrush}" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <ContentPresenter Margin="0,0,0,8" />
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Left" Text="{Binding Glyph}" FontFamily="Segoe MDL2 Assets" Foreground="{Binding Brush}" Margin="0,3,10,0" />
+                                <TextBlock DockPanel.Dock="Left" Text="{Binding Time}" Foreground="{StaticResource MutedBrush}" FontFamily="{StaticResource MonoFont}" FontSize="12" Margin="0,2,10,0" />
+                                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" FontSize="13" FlowDirection="LeftToRight" />
+                            </DockPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </DockPanel>
+        </Border>
+
+        <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource Card}">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="{l:T Act_History}" Style="{StaticResource CardTitle}" />
+                <DataGrid ItemsSource="{Binding History}" HorizontalScrollBarVisibility="Auto">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="{l:T Col_User}" Binding="{Binding Username}" Width="*" MinWidth="110" />
+                        <DataGridTextColumn Header="{l:T Col_Ip}" Binding="{Binding Ip}" Width="Auto" />
+                        <DataGridTextColumn Header="{l:T Col_Started}" Binding="{Binding Started}" Width="Auto" />
+                        <DataGridTextColumn Header="{l:T Col_Ended}" Binding="{Binding Ended}" Width="Auto" />
+                        <DataGridTextColumn Header="{l:T Col_Download}" Binding="{Binding Download}" Width="Auto" />
+                        <DataGridTextColumn Header="{l:T Col_Upload}" Binding="{Binding Upload}" Width="Auto" />
+                        <DataGridTextColumn Header="{l:T Col_Reason}" Binding="{Binding Reason}" Width="Auto" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

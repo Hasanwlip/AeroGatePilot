@@ -1,0 +1,13 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Company>Hasanwlip / Nodepilot</Company>
+    <Product>AeroGate Pilot</Product>
+    <Version>1.0.9</Version>
+    <Copyright>Copyright (c) 2026 Hasanwlip (Nodepilot)</Copyright>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+</Project>

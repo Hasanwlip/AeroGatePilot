@@ -1,0 +1,217 @@
+<UserControl x:Class="AeroGatePilot.App.Views.PortalView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:AeroGatePilot.App.Localization">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="32,0,32,32">
+        <StackPanel>
+            <DockPanel Margin="0,0,0,22">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="{l:T Btn_Preview}" Command="{Binding PreviewCommand}" Margin="0,0,10,0" ToolTip="{l:T Portal_PreviewHint}" />
+                    <Button Style="{StaticResource PrimaryButton}" Content="{l:T Btn_Save}" Command="{Binding SaveCommand}" MinWidth="120" />
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock Text="{l:T Portal_Title}" Style="{StaticResource PageTitle}" />
+                    <TextBlock Text="{l:T Portal_Subtitle}" Style="{StaticResource PageSubtitle}" />
+                </StackPanel>
+            </DockPanel>
+
+            <Border CornerRadius="12" Padding="14,10" Margin="0,0,0,16" BorderThickness="1"
+                    Visibility="{Binding Message, Converter={StaticResource Visible}}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="#2200CEC9" />
+                        <Setter Property="BorderBrush" Value="#6600CEC9" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding MessageIsError}" Value="True">
+                                <Setter Property="Background" Value="#33FF4757" />
+                                <Setter Property="BorderBrush" Value="#88FF4757" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+            </Border>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel>
+                    <!-- Access -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="{l:T Portal_Access}" Style="{StaticResource CardTitle}" />
+                            <TextBlock Text="{l:T Portal_Mode}" Style="{StaticResource Label}" />
+                            <Border Background="{StaticResource FieldBrush}" CornerRadius="12" Padding="2" HorizontalAlignment="Left">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton Style="{StaticResource Segment}" GroupName="AuthMode" Content="{l:T Mode_UserPassword}"
+                                                 IsChecked="{Binding AuthMode, Converter={StaticResource EnumMatch}, ConverterParameter=UserPassword}" />
+                                    <RadioButton Style="{StaticResource Segment}" GroupName="AuthMode" Content="{l:T Mode_Guest}"
+                                                 IsChecked="{Binding AuthMode, Converter={StaticResource EnumMatch}, ConverterParameter=GuestClickThrough}" />
+                                    <RadioButton Style="{StaticResource Segment}" GroupName="AuthMode" Content="{l:T Mode_Both}"
+                                                 IsChecked="{Binding AuthMode, Converter={StaticResource EnumMatch}, ConverterParameter=Both}" />
+                                </StackPanel>
+                            </Border>
+
+                            <StackPanel Visibility="{Binding UsesGuest, Converter={StaticResource Visible}}">
+                                <TextBlock Text="{l:T Portal_GuestPlan}" Style="{StaticResource Label}" Margin="0,16,0,6" />
+                                <ComboBox ItemsSource="{Binding Plans}" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding PortalSettings.GuestPlanId}" />
+                            </StackPanel>
+
+                            <TextBlock Text="{l:T Portal_Redirect}" Style="{StaticResource Label}" Margin="0,16,0,6" />
+                            <TextBox Text="{Binding PortalSettings.SuccessRedirectUrl, UpdateSourceTrigger=PropertyChanged}" FlowDirection="LeftToRight" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Branding texts -->
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                        <StackPanel>
+                            <TextBlock Text="{l:T Portal_Branding}" Style="{StaticResource CardTitle}" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="{l:T Field_Title}" Style="{StaticResource Label}" />
+                                    <TextBox Text="{Binding Branding.Title, UpdateSourceTrigger=PropertyChanged}" FlowDirection="LeftToRight" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="{l:T Field_TitleFa}" Style="{StaticResource Label}" />
+                                    <TextBox Text="{Binding Branding.TitleFa, UpdateSourceTrigger=PropertyChanged}" FlowDirection="RightToLeft" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="1" Margin="0,14,0,0">
+                                    <TextBlock Text="{l:T Field_Subtitle}" Style="{StaticResource Label}" />
+                                    <TextBox Text="{Binding Branding.Subtitle, UpdateSourceTrigger=PropertyChanged}" FlowDirection="LeftToRight" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,14,0,0">
+                                    <TextBlock Text="{l:T Field_SubtitleFa}" Style="{StaticResource Label}" />
+                                    <TextBox Text="{Binding Branding.SubtitleFa, UpdateSourceTrigger=PropertyChanged}" FlowDirection="RightToLeft" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="2" Margin="0,14,0,0">
+                                    <TextBlock Text="{l:T Field_Terms}" Style="{StaticResource Label}" />
+                                    <TextBox Style="{StaticResource MultilineBox}" Text="{Binding Branding.Terms, UpdateSourceTrigger=PropertyChanged}" FlowDirection="LeftToRight" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="2" Grid.Column="2" Margin="0,14,0,0">
+                                    <TextBlock Text="{l:T Field_TermsFa}" Style="{StaticResource Label}" />
+                                    <TextBox Style="{StaticResource MultilineBox}" Text="{Binding Branding.TermsFa, UpdateSourceTrigger=PropertyChanged}" FlowDirection="RightToLeft" />
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock Text="{l:T Field_Footer}" Style="{StaticResource Label}" Margin="0,14,0,6" />
+                            <TextBox Text="{Binding Branding.Footer, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <Grid Margin="0,14,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="{l:T Field_Primary}" Style="{StaticResource Label}" />
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Left" Width="40" Height="40" CornerRadius="12" Margin="0,0,8,0"
+                                                Background="{Binding PrimaryColor, Converter={StaticResource HexBrush}}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" />
+                                        <TextBox Text="{Binding PrimaryColor, UpdateSourceTrigger=PropertyChanged}" FontFamily="{StaticResource MonoFont}" FlowDirection="LeftToRight" />
+                                    </DockPanel>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="{l:T Field_Accent}" Style="{StaticResource Label}" />
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Left" Width="40" Height="40" CornerRadius="12" Margin="0,0,8,0"
+                                                Background="{Binding AccentColor, Converter={StaticResource HexBrush}}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" />
+                                        <TextBox Text="{Binding AccentColor, UpdateSourceTrigger=PropertyChanged}" FontFamily="{StaticResource MonoFont}" FlowDirection="LeftToRight" />
+                                    </DockPanel>
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock Text="{l:T Field_PortalLanguage}" Style="{StaticResource Label}" Margin="0,14,0,6" />
+                            <ComboBox ItemsSource="{Binding Languages}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Branding.DefaultLanguage}" />
+                            <CheckBox Style="{StaticResource Toggle}" Content="{l:T Field_LangSwitch}" IsChecked="{Binding Branding.ShowLanguageSwitch}" Margin="0,16,0,0" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2">
+                    <!-- Images -->
+                    <Border Style="{StaticResource Card}">
+                        <StackPanel>
+                            <TextBlock Text="{l:T Portal_Logo}" Style="{StaticResource CardTitle}" />
+                            <DockPanel>
+                                <Border DockPanel.Dock="Left" Width="120" Height="90" CornerRadius="14" Background="{StaticResource FieldBrush}"
+                                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Margin="0,0,16,0">
+                                    <Grid>
+                                        <Image Source="{Binding LogoPreview}" Margin="10" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                                        <TextBlock Text="{l:T Portal_NoImage}" Foreground="{StaticResource MutedBrush}" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   Visibility="{Binding HasLogo, Converter={StaticResource Hidden}}" />
+                                    </Grid>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <Button Content="{l:T Btn_Browse}" Command="{Binding PickLogoCommand}" HorizontalAlignment="Left" />
+                                    <Button Style="{StaticResource GhostButton}" Content="{l:T Btn_Clear}" Command="{Binding ClearLogoCommand}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                                            Visibility="{Binding HasLogo, Converter={StaticResource Visible}}" />
+                                </StackPanel>
+                            </DockPanel>
+
+                            <TextBlock Text="{l:T Portal_Background}" Style="{StaticResource CardTitle}" Margin="0,22,0,14" />
+                            <DockPanel>
+                                <Border DockPanel.Dock="Left" Width="120" Height="90" CornerRadius="14" Background="{StaticResource FieldBrush}"
+                                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Margin="0,0,16,0" ClipToBounds="True">
+                                    <Grid>
+                                        <Image Source="{Binding BackgroundPreview}" Stretch="UniformToFill" />
+                                        <TextBlock Text="{l:T Portal_NoImage}" Foreground="{StaticResource MutedBrush}" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   Visibility="{Binding HasBackground, Converter={StaticResource Hidden}}" />
+                                    </Grid>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <Button Content="{l:T Btn_Browse}" Command="{Binding PickBackgroundCommand}" HorizontalAlignment="Left" />
+                                    <Button Style="{StaticResource GhostButton}" Content="{l:T Btn_Clear}" Command="{Binding ClearBackgroundCommand}" HorizontalAlignment="Left" Margin="0,8,0,0"
+                                            Visibility="{Binding HasBackground, Converter={StaticResource Visible}}" />
+                                </StackPanel>
+                            </DockPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- CSS -->
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                        <StackPanel>
+                            <TextBlock Text="{l:T Portal_Css}" Style="{StaticResource CardTitle}" />
+                            <TextBox Style="{StaticResource CodeBox}" Text="{Binding Branding.CustomCss, UpdateSourceTrigger=PropertyChanged}" Height="180"
+                                     VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
+                            <TextBlock Text="{l:T Portal_CssHint}" Style="{StaticResource Hint}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Template files -->
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                        <StackPanel>
+                            <TextBlock Text="{l:T Portal_Template}" Style="{StaticResource CardTitle}" />
+                            <TextBlock Text="{l:T Portal_TemplateHint}" Style="{StaticResource Label}" />
+                            <Border Background="{StaticResource FieldBrush}" CornerRadius="10" Padding="12,8" Margin="0,8,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding TemplateStatus}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding TemplateDirectory}" FontFamily="{StaticResource MonoFont}" FontSize="12" Foreground="{StaticResource MutedBrush}"
+                                               FlowDirection="LeftToRight" HorizontalAlignment="Left" TextTrimming="CharacterEllipsis" Margin="0,4,0,0" />
+                                </StackPanel>
+                            </Border>
+                            <WrapPanel Margin="0,12,0,0">
+                                <Button Content="{l:T Btn_ExportTemplate}" Command="{Binding ExportTemplateCommand}" Margin="0,0,8,8" />
+                                <Button Content="{l:T Btn_OpenFolder}" Command="{Binding OpenTemplateFolderCommand}" Margin="0,0,8,8" />
+                                <Button Style="{StaticResource GhostButton}" Content="{l:T Btn_ResetTemplate}" Command="{Binding ResetTemplateCommand}" Margin="0,0,8,8" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

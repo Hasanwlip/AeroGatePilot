@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="{{lang}}" dir="{{dir}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="/portal/assets/portal.css?v={{asset_version}}">
+  <style>:root { --primary: {{primary}}; --accent: {{accent}}; }</style>
+  <!--IF:background--><style>.backdrop { background-image: url('/portal/assets/background?v={{asset_version}}'); }</style><!--ENDIF:background-->
+  <!--IF:custom_css--><link rel="stylesheet" href="/portal/assets/custom.css?v={{asset_version}}"><!--ENDIF:custom_css-->
+</head>
+<body class="page-login">
+  <div class="backdrop"></div>
+  <div class="orb orb-a"></div>
+  <div class="orb orb-b"></div>
+
+  <main class="shell">
+    <!--IF:lang_switch--><a class="lang-switch" href="/portal/?lang={{other_lang}}&amp;dst={{dst_query}}">{{other_lang_label}}</a><!--ENDIF:lang_switch-->
+
+    <section class="card">
+      <header class="brand">
+        <!--IF:logo--><img class="logo" src="/portal/assets/logo?v={{asset_version}}" alt="{{title}}"><!--ENDIF:logo-->
+        <!--IF:no_logo-->
+        <div class="logo logo-default" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 18.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3Zm-4.6-3.2a6.5 6.5 0 0 1 9.2 0l-1.4 1.4a4.5 4.5 0 0 0-6.4 0l-1.4-1.4ZM4.6 12.5a10.5 10.5 0 0 1 14.8 0L18 13.9a8.5 8.5 0 0 0-12 0l-1.4-1.4ZM1.8 9.7a14.5 14.5 0 0 1 20.4 0l-1.4 1.4a12.5 12.5 0 0 0-17.6 0L1.8 9.7Z"/></svg>
+        </div>
+        <!--ENDIF:no_logo-->
+        <h1>{{title}}</h1>
+        <p class="subtitle">{{subtitle}}</p>
+      </header>
+
+      <!--IF:error--><div class="alert" role="alert">{{error}}</div><!--ENDIF:error-->
+
+      <!--IF:user_form-->
+      <form class="form" method="post" action="/portal/login?lang={{lang}}" autocomplete="on">
+        <input type="hidden" name="dst" value="{{dst}}">
+        <label class="field">
+          <span>{{t.username}}</span>
+          <input name="username" value="{{username_value}}" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+        </label>
+        <label class="field">
+          <span>{{t.password}}</span>
+          <div class="password-wrap">
+            <input name="password" type="password" autocomplete="current-password" required>
+            <button type="button" class="reveal" aria-label="{{t.show_password}}" data-reveal>
+              <svg viewBox="0 0 24 24"><path d="M12 5c5 0 9 4.5 10 7-1 2.5-5 7-10 7S3 14.5 2 12c1-2.5 5-7 10-7Zm0 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0 2a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z"/></svg>
+            </button>
+          </div>
+        </label>
+        <!--IF:terms-->
+        <label class="check">
+          <input type="checkbox" name="accept" required>
+          <span>{{t.accept_terms}}</span>
+        </label>
+        <!--ENDIF:terms-->
+        <button class="btn btn-primary" type="submit">{{t.sign_in}}</button>
+      </form>
+      <!--ENDIF:user_form-->
+
+      <!--IF:both_forms--><div class="divider"><span>{{t.or}}</span></div><!--ENDIF:both_forms-->
+
+      <!--IF:guest_form-->
+      <form class="form" method="post" action="/portal/guest?lang={{lang}}">
+        <input type="hidden" name="dst" value="{{dst}}">
+        <!--IF:terms-->
+        <label class="check">
+          <input type="checkbox" name="accept" required>
+          <span>{{t.accept_terms}}</span>
+        </label>
+        <!--ENDIF:terms-->
+        <button class="btn btn-ghost" type="submit">{{t.guest}}</button>
+      </form>
+      <!--ENDIF:guest_form-->
+
+      <!--IF:terms--><p class="terms">{{terms}}</p><!--ENDIF:terms-->
+    </section>
+
+    <!--IF:footer--><footer class="footer">{{footer}}</footer><!--ENDIF:footer-->
+  </main>
+
+  <script src="/portal/assets/portal.js?v={{asset_version}}"></script>
+</body>
+</html>

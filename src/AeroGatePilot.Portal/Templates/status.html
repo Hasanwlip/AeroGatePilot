@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="{{lang}}" dir="{{dir}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="/portal/assets/portal.css?v={{asset_version}}">
+  <style>:root { --primary: {{primary}}; --accent: {{accent}}; }</style>
+  <!--IF:background--><style>.backdrop { background-image: url('/portal/assets/background?v={{asset_version}}'); }</style><!--ENDIF:background-->
+  <!--IF:custom_css--><link rel="stylesheet" href="/portal/assets/custom.css?v={{asset_version}}"><!--ENDIF:custom_css-->
+</head>
+<body class="page-status" data-status-poll="/portal/api/status?lang={{lang}}">
+  <div class="backdrop"></div>
+  <div class="orb orb-a"></div>
+  <div class="orb orb-b"></div>
+
+  <main class="shell">
+    <!--IF:lang_switch--><a class="lang-switch" href="/portal/?lang={{other_lang}}">{{other_lang_label}}</a><!--ENDIF:lang_switch-->
+
+    <section class="card">
+      <header class="brand">
+        <!--IF:logo--><img class="logo" src="/portal/assets/logo?v={{asset_version}}" alt="{{title}}"><!--ENDIF:logo-->
+        <div class="success-badge" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M9.5 16.2 5.3 12l-1.4 1.4 5.6 5.6L21.1 7.4 19.7 6z"/></svg>
+        </div>
+        <h1>{{t.connected}}</h1>
+        <p class="subtitle">{{t.welcome}}, <strong>{{display_name}}</strong></p>
+      </header>
+
+      <!--IF:data_limited-->
+      <div class="meter">
+        <div class="meter-head">
+          <span>{{t.data_used}}</span>
+          <strong data-field="data_used">{{data_used}}</strong>
+        </div>
+        <div class="meter-bar"><div class="meter-fill" data-field-width="data_percent" style="width: {{data_percent}}%"></div></div>
+      </div>
+      <!--ENDIF:data_limited-->
+
+      <dl class="stats">
+        <div><dt>{{t.plan}}</dt><dd>{{plan}}</dd></div>
+        <div><dt>{{t.data_left}}</dt><dd data-field="data_left">{{data_left}}</dd></div>
+        <div><dt>{{t.time_left}}</dt><dd data-field="time_left">{{time_left}}</dd></div>
+        <div><dt>{{t.session}}</dt><dd data-field="session_data">{{session_data}}</dd></div>
+        <div><dt>{{t.download}}</dt><dd>{{download_limit}}</dd></div>
+        <div><dt>{{t.upload}}</dt><dd>{{upload_limit}}</dd></div>
+        <!--IF:expires--><div class="wide"><dt>{{t.expires}}</dt><dd>{{expires}}</dd></div><!--ENDIF:expires-->
+      </dl>
+
+      <p class="hint">{{t.connected_hint}}</p>
+
+      <div class="actions">
+        <!--IF:continue--><a class="btn btn-primary" href="{{continue_url}}">{{t.continue}}</a><!--ENDIF:continue-->
+        <form method="post" action="/portal/logout?lang={{lang}}">
+          <button class="btn btn-ghost" type="submit">{{t.logout}}</button>
+        </form>
+      </div>
+    </section>
+
+    <!--IF:footer--><footer class="footer">{{footer}}</footer><!--ENDIF:footer-->
+  </main>
+
+  <script src="/portal/assets/portal.js?v={{asset_version}}"></script>
+</body>
+</html>

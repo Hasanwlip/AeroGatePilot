@@ -1,0 +1,140 @@
+<UserControl x:Class="AeroGatePilot.App.Views.PlansView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:AeroGatePilot.App.Localization">
+    <Grid Margin="32,0,32,32">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="20" />
+            <ColumnDefinition Width="340" />
+        </Grid.ColumnDefinitions>
+
+        <DockPanel Grid.ColumnSpan="3" Margin="0,0,0,22">
+            <Button DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Command="{Binding NewCommand}" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" VerticalAlignment="Center" />
+                    <TextBlock Text="{l:T Plans_New}" Margin="8,0,0,0" />
+                </StackPanel>
+            </Button>
+            <StackPanel>
+                <TextBlock Text="{l:T Plans_Title}" Style="{StaticResource PageTitle}" />
+                <TextBlock Text="{l:T Plans_Subtitle}" Style="{StaticResource PageSubtitle}" />
+            </StackPanel>
+        </DockPanel>
+
+        <Border Grid.Row="1" Style="{StaticResource Card}">
+            <DataGrid ItemsSource="{Binding Plans}" SelectedItem="{Binding Selected}" HorizontalScrollBarVisibility="Auto">
+                <DataGrid.Columns>
+                    <DataGridTemplateColumn Header="{l:T Col_Plan}" Width="*" MinWidth="170">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="30" Height="30" CornerRadius="9" Background="{StaticResource BrandGradient}">
+                                        <TextBlock Text="&#xE8EC;" FontFamily="Segoe MDL2 Assets" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="{l:T Col_Data}" Binding="{Binding Data}" Width="Auto" />
+                    <DataGridTextColumn Header="{l:T Col_Time}" Binding="{Binding Time}" Width="Auto" />
+                    <DataGridTextColumn Header="{l:T Col_Validity}" Binding="{Binding Validity}" Width="Auto" />
+                    <DataGridTextColumn Header="{l:T Col_SpeedLimit}" Binding="{Binding Speed}" Width="Auto" />
+                    <DataGridTextColumn Header="{l:T Col_Devices}" Binding="{Binding Devices}" Width="Auto" />
+                    <DataGridTextColumn Header="{l:T Col_Access}" Binding="{Binding Access}" Width="Auto" />
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource Card}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Text="{Binding EditorTitle}" Style="{StaticResource CardTitle}" FontSize="18" />
+
+                    <TextBlock Text="{l:T Field_PlanName}" Style="{StaticResource Label}" />
+                    <TextBox Text="{Binding Editing.Name, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <TextBlock Text="{l:T Field_DataLimit}" Style="{StaticResource Label}" Margin="0,14,0,6" />
+                    <TextBox Text="{Binding Editing.DataLimitMb, UpdateSourceTrigger=PropertyChanged}" FlowDirection="LeftToRight" />
+
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="{l:T Field_TimeLimit}" Style="{StaticResource Label}" Height="34" />
+                            <TextBox Text="{Binding Editing.TimeLimitMinutes, UpdateSourceTrigger=PropertyChanged}" FlowDirection="LeftToRight" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="{l:T Field_SessionLimit}" Style="{StaticResource Label}" Height="34" />
+                            <TextBox Text="{Binding Editing.SessionLimitMinutes, UpdateSourceTrigger=PropertyChanged}" FlowDirection="LeftToRight" />
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Text="{l:T Field_Validity}" Style="{StaticResource Label}" Margin="0,14,0,6" />
+                    <TextBox Text="{Binding Editing.ValidityDays, UpdateSourceTrigger=PropertyChanged}" FlowDirection="LeftToRight" />
+
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="{l:T Field_Download}" Style="{StaticResource Label}" Height="34" />
+                            <TextBox Text="{Binding Editing.DownloadKbps, UpdateSourceTrigger=PropertyChanged}" FlowDirection="LeftToRight" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="{l:T Field_Upload}" Style="{StaticResource Label}" Height="34" />
+                            <TextBox Text="{Binding Editing.UploadKbps, UpdateSourceTrigger=PropertyChanged}" FlowDirection="LeftToRight" />
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Text="{l:T Field_MaxDevices}" Style="{StaticResource Label}" Margin="0,14,0,6" />
+                    <TextBox Text="{Binding Editing.MaxDevices, UpdateSourceTrigger=PropertyChanged}" FlowDirection="LeftToRight" />
+
+                    <Border Background="#1A00CEC9" CornerRadius="12" Padding="12,10" Margin="0,12,0,0">
+                        <TextBlock Text="{l:T Plans_ZeroHint}" Foreground="{StaticResource AccentBrush}" FontSize="12.5" TextWrapping="Wrap" />
+                    </Border>
+
+                    <TextBlock Text="{l:T Plans_SiteAccess}" Style="{StaticResource Label}" Margin="0,18,0,6" />
+                    <Border Background="{StaticResource FieldBrush}" CornerRadius="12" Padding="2">
+                        <UniformGrid Columns="3">
+                            <RadioButton Style="{StaticResource Segment}" GroupName="SiteFilter" Content="{l:T Sites_Off}" HorizontalContentAlignment="Center"
+                                         IsChecked="{Binding SiteFilter, Converter={StaticResource EnumMatch}, ConverterParameter=Off}" />
+                            <RadioButton Style="{StaticResource Segment}" GroupName="SiteFilter" Content="{l:T Sites_Block}" HorizontalContentAlignment="Center"
+                                         IsChecked="{Binding SiteFilter, Converter={StaticResource EnumMatch}, ConverterParameter=BlockListed}" />
+                            <RadioButton Style="{StaticResource Segment}" GroupName="SiteFilter" Content="{l:T Sites_Allow}" HorizontalContentAlignment="Center"
+                                         IsChecked="{Binding SiteFilter, Converter={StaticResource EnumMatch}, ConverterParameter=AllowListed}" />
+                        </UniformGrid>
+                    </Border>
+                    <StackPanel Visibility="{Binding SiteListVisible, Converter={StaticResource Visible}}">
+                        <TextBlock Text="{Binding SiteModeHint}" Style="{StaticResource Hint}" />
+                        <TextBox Text="{Binding SiteList, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="NoWrap"
+                                 Height="120" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                                 FontFamily="{StaticResource MonoFont}" FlowDirection="LeftToRight" Margin="0,8,0,0" />
+                        <TextBlock Text="{l:T Sites_Syntax}" Style="{StaticResource Hint}" />
+                        <TextBlock Text="{Binding SiteListWarning}" Foreground="{StaticResource WarningBrush}" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0"
+                                   Visibility="{Binding SiteListWarning, Converter={StaticResource Visible}}" />
+                    </StackPanel>
+
+                    <CheckBox Style="{StaticResource Toggle}" Content="{l:T Plans_UseVpn}" IsChecked="{Binding UseVpn}" Margin="0,18,0,0" />
+                    <TextBlock Text="{l:T Plans_UseVpnHint}" Style="{StaticResource Hint}" />
+
+                    <TextBlock Text="{Binding Message}" Foreground="{StaticResource AccentBrush}" Margin="0,16,0,0" TextWrapping="Wrap"
+                               Visibility="{Binding Message, Converter={StaticResource Visible}}" />
+
+                    <Button Style="{StaticResource PrimaryButton}" Content="{l:T Btn_Save}" Command="{Binding SaveCommand}" Margin="0,20,0,0" />
+                    <Button Style="{StaticResource DangerButton}" Content="{l:T Btn_Delete}" Command="{Binding DeleteCommand}" Margin="0,10,0,0" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</UserControl>

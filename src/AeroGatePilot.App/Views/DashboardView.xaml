@@ -1,0 +1,174 @@
+<UserControl x:Class="AeroGatePilot.App.Views.DashboardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:l="clr-namespace:AeroGatePilot.App.Localization"
+             xmlns:c="clr-namespace:AeroGatePilot.App.Controls">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="32,0,32,32">
+        <StackPanel>
+            <TextBlock Text="{l:T Dash_Title}" Style="{StaticResource PageTitle}" />
+            <TextBlock Text="{l:T Dash_Subtitle}" Style="{StaticResource PageSubtitle}" />
+
+            <!-- Hero -->
+            <Border Margin="0,24,0,0" CornerRadius="22" Padding="28" Background="{StaticResource HeroGradient}" Effect="{StaticResource CardShadow}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="{l:T Dash_Ssid}" Foreground="#B8C0E8" FontSize="13" />
+                        <TextBlock Text="{Binding Ssid}" FontSize="34" FontWeight="Bold" Margin="0,2,0,18" />
+                        <UniformGrid Columns="4">
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Text="{l:T Dash_Wan}" Foreground="#B8C0E8" FontSize="12" />
+                                <TextBlock Text="{Binding Wan}" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,0" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Text="{l:T Dash_Gateway}" Foreground="#B8C0E8" FontSize="12" />
+                                <TextBlock Text="{Binding Gateway}" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,0" FlowDirection="LeftToRight" HorizontalAlignment="Left" />
+                            </StackPanel>
+                            <StackPanel Margin="0,0,16,0">
+                                <TextBlock Text="{l:T Dash_PortalUrl}" Foreground="#B8C0E8" FontSize="12" />
+                                <TextBox Text="{Binding PortalUrl, Mode=OneWay}" IsReadOnly="True" BorderThickness="0" Background="Transparent" Padding="0"
+                                         FontSize="14" FontWeight="SemiBold" Margin="0,4,0,0" FlowDirection="LeftToRight" HorizontalAlignment="Left" />
+                            </StackPanel>
+                            <StackPanel>
+                                <TextBlock Text="{l:T Dash_Uptime}" Foreground="#B8C0E8" FontSize="12" />
+                                <TextBlock Text="{Binding Uptime}" FontSize="14" FontWeight="SemiBold" Margin="0,4,0,0" />
+                            </StackPanel>
+                        </UniformGrid>
+                        <TextBlock Text="{l:T Dash_HintStopped}" Foreground="#D6DBF5" Margin="0,18,0,0" TextWrapping="Wrap"
+                                   Visibility="{Binding IsRunning, Converter={StaticResource Hidden}}" />
+                        <Border Background="#33FF4757" BorderBrush="#88FF4757" BorderThickness="1" CornerRadius="12" Padding="14,10" Margin="0,14,0,0"
+                                Visibility="{Binding LastError, Converter={StaticResource Visible}}">
+                            <TextBlock Text="{Binding LastError}" TextWrapping="Wrap" />
+                        </Border>
+                    </StackPanel>
+                    <Grid Grid.Column="1" Width="120" Height="120" Margin="24,0,0,0" VerticalAlignment="Center">
+                        <Ellipse Fill="#1AFFFFFF" />
+                        <Ellipse Margin="16" Fill="#22FFFFFF" />
+                        <Ellipse Margin="32" Fill="{StaticResource BrandGradient}" />
+                        <TextBlock Text="&#xE701;" FontFamily="Segoe MDL2 Assets" FontSize="26" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- Stat cards -->
+            <UniformGrid Columns="4" Margin="-8,16,-8,0">
+                <Border Style="{StaticResource Card}" Margin="8">
+                    <StackPanel>
+                        <TextBlock Text="{l:T Dash_Online}" Style="{StaticResource Label}" />
+                        <TextBlock Text="{Binding OnlineCount}" Style="{StaticResource StatValue}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Card}" Margin="8">
+                    <StackPanel>
+                        <TextBlock Text="{l:T Dash_Devices}" Style="{StaticResource Label}" />
+                        <TextBlock Text="{Binding DeviceCount}" Style="{StaticResource StatValue}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Card}" Margin="8">
+                    <StackPanel>
+                        <TextBlock Text="{l:T Dash_Download}" Style="{StaticResource Label}" />
+                        <TextBlock Text="{Binding DownloadRate}" Style="{StaticResource StatValue}" Foreground="{StaticResource AccentBrush}" FlowDirection="LeftToRight" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource Card}" Margin="8">
+                    <StackPanel>
+                        <TextBlock Text="{l:T Dash_Upload}" Style="{StaticResource Label}" />
+                        <TextBlock Text="{Binding UploadRate}" Style="{StaticResource StatValue}" Foreground="#A29BFE" FlowDirection="LeftToRight" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </Border>
+            </UniformGrid>
+
+            <!-- Chart + traffic control -->
+            <Grid Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Style="{StaticResource Card}">
+                    <DockPanel>
+                        <DockPanel DockPanel.Dock="Top">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Top">
+                                <Ellipse Width="8" Height="8" Fill="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                                <TextBlock Text="{l:T Col_Download}" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="6,0,14,0" />
+                                <Ellipse Width="8" Height="8" Fill="{StaticResource PrimaryBrush}" VerticalAlignment="Center" />
+                                <TextBlock Text="{l:T Col_Upload}" Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="6,0,0,0" />
+                            </StackPanel>
+                            <TextBlock Text="{l:T Dash_Throughput}" Style="{StaticResource CardTitle}" />
+                        </DockPanel>
+                        <c:Sparkline Height="170" Primary="{Binding DownSeries}" Secondary="{Binding UpSeries}" FlowDirection="LeftToRight" />
+                    </DockPanel>
+                </Border>
+                <Border Grid.Column="2" Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="{l:T Dash_Filter}" Style="{StaticResource CardTitle}" />
+                        <DockPanel Margin="0,0,0,10">
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding Forwarded, StringFormat=N0}" FontWeight="SemiBold" />
+                            <TextBlock Text="{l:T Dash_Forwarded}" Foreground="{StaticResource MutedBrush}" FontSize="12.5" />
+                        </DockPanel>
+                        <DockPanel Margin="0,0,0,10">
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding Blocked, StringFormat=N0}" FontWeight="SemiBold" Foreground="{StaticResource WarningBrush}" />
+                            <TextBlock Text="{l:T Dash_Blocked}" Foreground="{StaticResource MutedBrush}" FontSize="12.5" />
+                        </DockPanel>
+                        <DockPanel Margin="0,0,0,10">
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding DnsRedirects, StringFormat=N0}" FontWeight="SemiBold" />
+                            <TextBlock Text="{l:T Dash_DnsRedirects}" Foreground="{StaticResource MutedBrush}" FontSize="12.5" />
+                        </DockPanel>
+                        <DockPanel Margin="0,0,0,10">
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding PortalHits, StringFormat=N0}" FontWeight="SemiBold" />
+                            <TextBlock Text="{l:T Dash_PortalHits}" Foreground="{StaticResource MutedBrush}" FontSize="12.5" />
+                        </DockPanel>
+                        <DockPanel Margin="0,0,0,10">
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding RateLimited, StringFormat=N0}" FontWeight="SemiBold" />
+                            <TextBlock Text="{l:T Dash_RateLimited}" Foreground="{StaticResource MutedBrush}" FontSize="12.5" />
+                        </DockPanel>
+                        <DockPanel Margin="0,0,0,10">
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding HostBlocked, StringFormat=N0}" FontWeight="SemiBold" />
+                            <TextBlock Text="{l:T Dash_HostBlocked}" Foreground="{StaticResource MutedBrush}" FontSize="12.5" />
+                        </DockPanel>
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding SitesBlocked, StringFormat=N0}" FontWeight="SemiBold" Foreground="{StaticResource WarningBrush}" />
+                            <TextBlock Text="{l:T Dash_SitesBlocked}" Foreground="{StaticResource MutedBrush}" FontSize="12.5" />
+                        </DockPanel>
+                        <DockPanel Margin="0,10,0,0" Visibility="{Binding VpnActive, Converter={StaticResource Visible}}">
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding VpnConnections, StringFormat=N0}" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" />
+                            <TextBlock Text="{l:T Dash_VpnConnections}" Foreground="{StaticResource MutedBrush}" FontSize="12.5" />
+                        </DockPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Sessions -->
+            <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                <StackPanel>
+                    <TextBlock Text="{l:T Dash_Sessions}" Style="{StaticResource CardTitle}" />
+                    <TextBlock Text="{l:T Dash_NoSessions}" Foreground="{StaticResource MutedBrush}" Margin="0,4,0,8"
+                               Visibility="{Binding Sessions.Count, Converter={StaticResource Hidden}}" />
+                    <DataGrid ItemsSource="{Binding Sessions}" MaxHeight="420"
+                              Visibility="{Binding Sessions.Count, Converter={StaticResource Visible}}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="{l:T Col_User}" Binding="{Binding Username}" Width="1.2*" />
+                            <DataGridTextColumn Header="{l:T Col_Plan}" Binding="{Binding Plan}" Width="*" />
+                            <DataGridTextColumn Header="{l:T Col_Ip}" Binding="{Binding Ip}" Width="*" />
+                            <DataGridTextColumn Header="{l:T Col_Mac}" Binding="{Binding Mac}" Width="1.2*" />
+                            <DataGridTextColumn Header="{l:T Col_Started}" Binding="{Binding Started}" Width="0.7*" />
+                            <DataGridTextColumn Header="{l:T Col_Download}" Binding="{Binding Download}" Width="0.8*" />
+                            <DataGridTextColumn Header="{l:T Col_Upload}" Binding="{Binding Upload}" Width="0.8*" />
+                            <DataGridTextColumn Header="{l:T Col_Speed}" Binding="{Binding Speed}" Width="1.6*" />
+                            <DataGridTemplateColumn Width="Auto">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Style="{StaticResource SmallButton}" Content="{l:T Btn_Kick}" Command="{Binding KickCommand}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

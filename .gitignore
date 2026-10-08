@@ -1,0 +1,28 @@
+# Build
+bin/
+obj/
+dist/
+TestResults/
+*.user
+*.suo
+.vs/
+.idea/
+
+# Local / secrets
+*.db
+*.db-shm
+*.db-wal
+settings.json
+.env
+*.log
+
+# Third-party caches (downloaded on publish)
+third_party/xray/
+
+# OS / editor
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Temp UI captures
+docs/screenshots/*.tmp
