@@ -206,14 +206,20 @@ public sealed class IcsShareManager
     private static bool IsSharingEnabled(object config) =>
         Get(config, "SharingEnabled") is true;
 
+    private const System.Reflection.BindingFlags GetFlags =
+        System.Reflection.BindingFlags.GetProperty | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance;
+
+    private const System.Reflection.BindingFlags CallFlags =
+        System.Reflection.BindingFlags.InvokeMethod | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance;
+
     private static object? Get(object target, string name) =>
-        target.GetType().InvokeMember(name, System.Reflection.BindingFlags.GetProperty, null, target, null);
+        target.GetType().InvokeMember(name, GetFlags, null, target, null);
 
     private static object? GetIndex(object target, string name, object index) =>
-        target.GetType().InvokeMember(name, System.Reflection.BindingFlags.GetProperty, null, target, [index]);
+        target.GetType().InvokeMember(name, GetFlags, null, target, [index]);
 
     private static void Invoke(object target, string name, params object[] args) =>
-        target.GetType().InvokeMember(name, System.Reflection.BindingFlags.InvokeMethod, null, target, args.Length == 0 ? null : args);
+        target.GetType().InvokeMember(name, CallFlags, null, target, args.Length == 0 ? null : args);
 
     public static string NormalizeGuid(string? value)
     {
