@@ -1,0 +1,20 @@
+---
+description: Never add Cursor/agent as a GitHub contributor or co-author
+alwaysApply: true
+---
+
+# Sole GitHub contributor
+
+Repo owner/author is **Hasanwlip** only. Cursor / the agent must never appear as a contributor.
+
+## When committing or pushing
+
+- Author and committer must be Hasanwlip (e.g. `Hasanwlip <hasanwlip@users.noreply.github.com>` via `GIT_AUTHOR_*` / `GIT_COMMITTER_*` env — do not change git config).
+- **Never** add `Co-authored-by: Cursor`, `Co-authored-by: cursoragent`, or any similar trailer.
+- If a commit tool auto-appends a Cursor co-author line, amend/rewrite immediately and remove it before push (or force-with-lease if already pushed and the user wants it gone).
+- Do not create commits under Cursor Agent / `cursoragent@cursor.com` identity.
+
+## Releases / tags
+
+- Tags and releases must point only at commits that have no Cursor co-author metadata.
+---

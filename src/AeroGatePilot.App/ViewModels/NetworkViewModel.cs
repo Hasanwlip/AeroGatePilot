@@ -66,6 +66,8 @@ public sealed class VpnServerRow : ObservableObject
 public sealed class NetworkViewModel : PageViewModel
 {
     private WifiSettings _wifi = new();
+    private AdminApiSettings _api = new();
+    private WebhookSettings _webhook = new();
     private int _portalPort;
     private bool _isolateHost;
     private string _message = "";
@@ -92,6 +94,12 @@ public sealed class NetworkViewModel : PageViewModel
             _wifi.Passphrase = PasswordHasher.GeneratePassword(12);
             Raise(nameof(Wifi));
         });
+        GenerateApiTokenCommand = new RelayCommand(() =>
+        {
+            Api.Token = PasswordHasher.GeneratePassword(32);
+            Raise(nameof(Api));
+            Raise(nameof(ApiBaseUrl));
+        });
         LoadFromSettings();
     }
 
@@ -100,6 +108,7 @@ public sealed class NetworkViewModel : PageViewModel
     public RelayCommand SaveCommand { get; }
     public AsyncRelayCommand RefreshCommand { get; }
     public RelayCommand GeneratePasswordCommand { get; }
+    public RelayCommand GenerateApiTokenCommand { get; }
     public AsyncRelayCommand TestVpnCommand { get; }
     public RelayCommand ImportCommand { get; }
     public RelayCommand PasteImportCommand { get; }
@@ -108,6 +117,7 @@ public sealed class NetworkViewModel : PageViewModel
     public AsyncRelayCommand PingSelectedCommand { get; }
 
     public ObservableCollection<VpnServerRow> Servers { get; } = [];
+    public ObservableCollection<Option<string>> LanOptions { get; } = [];
 
     public UpstreamProxySettings Upstream
     {
@@ -223,11 +233,41 @@ public sealed class NetworkViewModel : PageViewModel
         new(WifiBand.FiveGHz, Loc.T("Band_5")),
     ];
 
+    public GatewayMode GatewayMode
+    {
+        get => _wifi.Mode;
+        set
+        {
+            _wifi.Mode = value;
+            Raise();
+            Raise(nameof(IsHotspotMode));
+            Raise(nameof(IsLanShareMode));
+        }
+    }
+
+    public bool IsHotspotMode => _wifi.Mode == GatewayMode.MobileHotspot;
+    public bool IsLanShareMode => _wifi.Mode == GatewayMode.LanShare;
+
     public WifiSettings Wifi
     {
         get => _wifi;
         private set => Set(ref _wifi, value);
     }
+
+    public AdminApiSettings Api
+    {
+        get => _api;
+        private set => Set(ref _api, value);
+    }
+
+    public WebhookSettings Webhook
+    {
+        get => _webhook;
+        private set => Set(ref _webhook, value);
+    }
+
+    public string ApiBaseUrl =>
+        $"http://{(string.IsNullOrWhiteSpace(_api.ListenAddress) ? "127.0.0.1" : _api.ListenAddress.Trim())}:{_api.Port}/api/v1/";
 
     public int PortalPort
     {
@@ -286,6 +326,8 @@ public sealed class NetworkViewModel : PageViewModel
     {
         var settings = Services.Settings.Snapshot();
         Wifi = settings.Wifi;
+        Api = settings.Api;
+        Webhook = settings.Webhook;
         PortalPort = settings.Portal.InternalPort;
         IsolateHost = settings.Portal.IsolateHost;
         Upstream = settings.Upstream;
@@ -301,6 +343,10 @@ public sealed class NetworkViewModel : PageViewModel
         Raise(nameof(VpnEnabled));
         Raise(nameof(CoreInstalled));
         Raise(nameof(CoreStatus));
+        Raise(nameof(GatewayMode));
+        Raise(nameof(IsHotspotMode));
+        Raise(nameof(IsLanShareMode));
+        Raise(nameof(ApiBaseUrl));
         RaiseAll();
     }
 
@@ -425,8 +471,12 @@ public sealed class NetworkViewModel : PageViewModel
 
     private async Task RefreshAdaptersAsync()
     {
-        var (candidates, adapters) = await Task.Run(() => (HotspotManager.GetWanCandidates(), NetworkDiagnostics.GetAdapters()));
+        var (candidates, adapters, lans) = await Task.Run(() => (
+            HotspotManager.GetWanCandidates(),
+            NetworkDiagnostics.GetAdapters(),
+            IcsShareManager.GetLanCandidates(_wifi.WanAdapterId)));
         var selected = _wifi.WanAdapterId;
+        var selectedLan = _wifi.LanAdapterId;
 
         WanOptions.Clear();
         WanOptions.Add(new Option<string>("", Loc.T("Net_Auto")));
@@ -439,29 +489,69 @@ public sealed class NetworkViewModel : PageViewModel
         if (!string.IsNullOrEmpty(selected) && WanOptions.All(o => o.Value != selected))
             WanOptions.Add(new Option<string>(selected, selected));
 
+        LanOptions.Clear();
+        LanOptions.Add(new Option<string>("", Loc.T("Net_LanPick")));
+        foreach (var lan in lans)
+        {
+            var link = lan.IsUp ? Loc.T("Net_LanUp") : Loc.T("Net_LanDown");
+            LanOptions.Add(new Option<string>(lan.AdapterId, $"{lan.Name}  ·  {link}  ·  {lan.Description}"));
+        }
+        if (!string.IsNullOrEmpty(selectedLan) && LanOptions.All(o => o.Value != selectedLan))
+            LanOptions.Add(new Option<string>(selectedLan, selectedLan));
+
         Adapters.Clear();
         foreach (var adapter in adapters)
             Adapters.Add(adapter);
 
         _wifi.WanAdapterId = selected;
+        _wifi.LanAdapterId = selectedLan;
         Raise(nameof(Wifi));
     }
 
     private void Save()
     {
-        if (string.IsNullOrWhiteSpace(_wifi.Ssid) || _wifi.Ssid.Length > 32)
+        if (_wifi.Mode == GatewayMode.LanShare)
         {
-            Fail("Msg_InvalidSsid");
-            return;
+            if (string.IsNullOrWhiteSpace(_wifi.LanAdapterId))
+            {
+                Fail("Msg_LanRequired");
+                return;
+            }
         }
-        if (_wifi.Passphrase.Length is < 8 or > 63)
+        else
         {
-            Fail("Msg_InvalidPassphrase");
-            return;
+            if (string.IsNullOrWhiteSpace(_wifi.Ssid) || _wifi.Ssid.Length > 32)
+            {
+                Fail("Msg_InvalidSsid");
+                return;
+            }
+            if (_wifi.Passphrase.Length is < 8 or > 63)
+            {
+                Fail("Msg_InvalidPassphrase");
+                return;
+            }
         }
         if (_portalPort is < 1024 or > 65535)
         {
             Fail("Msg_InvalidPort");
+            return;
+        }
+        if (_api.Enabled)
+        {
+            if (string.IsNullOrWhiteSpace(_api.Token) || _api.Token.Length < 16)
+            {
+                Fail("Msg_ApiToken");
+                return;
+            }
+            if (_api.Port is < 1024 or > 65535 || _api.Port == _portalPort)
+            {
+                Fail("Msg_ApiPort");
+                return;
+            }
+        }
+        if (_webhook.Enabled && string.IsNullOrWhiteSpace(_webhook.Url))
+        {
+            Fail("Msg_WebhookUrl");
             return;
         }
 
@@ -497,16 +587,29 @@ public sealed class NetworkViewModel : PageViewModel
             return;
         }
 
+        _api.ListenAddress = string.IsNullOrWhiteSpace(_api.ListenAddress) ? "127.0.0.1" : _api.ListenAddress.Trim();
+        _api.Token = _api.Token?.Trim() ?? "";
+        _webhook.Url = _webhook.Url?.Trim() ?? "";
+        _webhook.Secret = _webhook.Secret?.Trim() ?? "";
+
         var settings = Services.Settings.Snapshot();
         settings.Wifi = _wifi;
         settings.Portal.InternalPort = _portalPort;
         settings.Portal.IsolateHost = _isolateHost;
         settings.Upstream = _upstream;
+        settings.Api = _api;
+        settings.Webhook = _webhook;
         Services.Settings.Save(settings);
         Services.Log.Info("Network settings saved.");
         var saved = Services.Settings.Snapshot();
         Wifi = saved.Wifi;
+        Api = saved.Api;
+        Webhook = saved.Webhook;
         Upstream = saved.Upstream;
+        Raise(nameof(GatewayMode));
+        Raise(nameof(IsHotspotMode));
+        Raise(nameof(IsLanShareMode));
+        Raise(nameof(ApiBaseUrl));
         MessageIsError = false;
         Message = Loc.T(IsRunning ? "Net_RestartNotice" : "Msg_Saved");
     }

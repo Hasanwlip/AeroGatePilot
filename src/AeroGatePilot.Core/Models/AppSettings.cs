@@ -14,6 +14,13 @@ public enum WifiBand
     FiveGHz,
 }
 
+/// <summary>How client devices reach this PC: Windows Mobile Hotspot, or ICS on a LAN NIC (switch / MikroTik / APs).</summary>
+public enum GatewayMode
+{
+    MobileHotspot,
+    LanShare,
+}
+
 public sealed class AppSettings
 {
     public string Language { get; set; } = "en";
@@ -21,6 +28,25 @@ public sealed class AppSettings
     public PortalSettings Portal { get; set; } = new();
     public BrandingSettings Branding { get; set; } = new();
     public UpstreamProxySettings Upstream { get; set; } = new();
+    public AdminApiSettings Api { get; set; } = new();
+    public WebhookSettings Webhook { get; set; } = new();
+}
+
+public sealed class AdminApiSettings
+{
+    public bool Enabled { get; set; }
+    public string ListenAddress { get; set; } = "127.0.0.1";
+    public int Port { get; set; } = 8644;
+    public string Token { get; set; } = "";
+}
+
+public sealed class WebhookSettings
+{
+    public bool Enabled { get; set; }
+    public string Url { get; set; } = "";
+    public string Secret { get; set; } = "";
+    public bool OnFlush { get; set; } = true;
+    public bool OnSessionEnd { get; set; } = true;
 }
 
 public enum UpstreamProxyType
@@ -83,6 +109,8 @@ public sealed class UpstreamProxySettings
 
 public sealed class WifiSettings
 {
+    public GatewayMode Mode { get; set; } = GatewayMode.MobileHotspot;
+
     public string Ssid { get; set; } = "AeroGate";
     public string Passphrase { get; set; } = "";
     public WifiBand Band { get; set; } = WifiBand.Auto;
@@ -95,6 +123,9 @@ public sealed class WifiSettings
 
     /// <summary>Network adapter id (GUID) of the internet (WAN) connection to share. Empty = auto.</summary>
     public string WanAdapterId { get; set; } = "";
+
+    /// <summary>LAN adapter id (GUID) that receives ICS and connects to the switch / MikroTik (LanShare mode).</summary>
+    public string LanAdapterId { get; set; } = "";
 }
 
 public sealed class PortalSettings

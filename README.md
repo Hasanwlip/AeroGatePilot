@@ -66,9 +66,11 @@ Built for cafés, classrooms, offices, events, and home labs. One installer. One
 
 ### Gateway
 - Windows **Mobile Hotspot** + Internet Connection Sharing (NAT / DHCP / DNS)
-- Automatic ICS repair when phones associate but get no IP
+- **LAN share** mode: second NIC → switch / MikroTik → multiple AP SSIDs, same captive portal
+- Automatic ICS repair when clients associate but get no IP
 - WinDivert packet filter for portal enforcement, quotas, and routing
 - Clean teardown and snapshot restore of hotspot settings
+- Live usage flush to SQLite (~1s) + **Admin API** (token) + optional **webhook** for external panels
 
 ### Captive portal
 - Username/password, guest click‑through, or both

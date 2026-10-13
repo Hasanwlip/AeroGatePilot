@@ -102,12 +102,19 @@ public static class NetworkDiagnostics
             ? new DiagnosticItem("Diag_WinDivert", DiagnosticStatus.Ok, "WinDivert 2.2.2")
             : new DiagnosticItem("Diag_WinDivert", DiagnosticStatus.Error, divertError));
 
-        var wifiAdapters = NetworkInterface.GetAllNetworkInterfaces()
-            .Where(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 && !n.Description.Contains("Virtual", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        items.Add(wifiAdapters.Count > 0
-            ? new DiagnosticItem("Diag_Wifi", DiagnosticStatus.Ok, string.Join(", ", wifiAdapters.Select(w => w.Description)))
-            : new DiagnosticItem("Diag_Wifi", DiagnosticStatus.Error, "No Wi-Fi adapter found"));
+        var lanShare = settings.Wifi.Mode == GatewayMode.LanShare;
+        items.Add(new DiagnosticItem("Diag_Mode", DiagnosticStatus.Info,
+            lanShare ? "LAN share (switch / MikroTik / APs)" : "Windows Mobile Hotspot"));
+
+        if (!lanShare)
+        {
+            var wifiAdapters = NetworkInterface.GetAllNetworkInterfaces()
+                .Where(n => n.NetworkInterfaceType == NetworkInterfaceType.Wireless80211 && !n.Description.Contains("Virtual", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            items.Add(wifiAdapters.Count > 0
+                ? new DiagnosticItem("Diag_Wifi", DiagnosticStatus.Ok, string.Join(", ", wifiAdapters.Select(w => w.Description)))
+                : new DiagnosticItem("Diag_Wifi", DiagnosticStatus.Error, "No Wi-Fi adapter found"));
+        }
 
         try
         {
@@ -123,9 +130,12 @@ public static class NetworkDiagnostics
                 var status = !wan.HasInternet ? DiagnosticStatus.Warning : wan.IsEthernet ? DiagnosticStatus.Ok : DiagnosticStatus.Warning;
                 var detail = wan.IsEthernet ? $"{wan.Name} (Ethernet)" : $"{wan.Name} — Ethernet is recommended; sharing Wi-Fi over Wi-Fi depends on the adapter";
                 items.Add(new DiagnosticItem("Diag_Wan", status, detail));
-                items.Add(wan.Capability == TetheringCapability.Enabled
-                    ? new DiagnosticItem("Diag_Tethering", DiagnosticStatus.Ok, "Windows Mobile Hotspot can share this connection")
-                    : new DiagnosticItem("Diag_Tethering", DiagnosticStatus.Error, wan.Capability.ToString()));
+                if (!lanShare)
+                {
+                    items.Add(wan.Capability == TetheringCapability.Enabled
+                        ? new DiagnosticItem("Diag_Tethering", DiagnosticStatus.Ok, "Windows Mobile Hotspot can share this connection")
+                        : new DiagnosticItem("Diag_Tethering", DiagnosticStatus.Error, wan.Capability.ToString()));
+                }
             }
         }
         catch (Exception ex)
@@ -133,12 +143,39 @@ public static class NetworkDiagnostics
             items.Add(new DiagnosticItem("Diag_Tethering", DiagnosticStatus.Error, ex.Message));
         }
 
-        items.Add(settings.Wifi.OpenNetwork
-            ? new DiagnosticItem("Diag_Open", DiagnosticStatus.Warning, "Windows Mobile Hotspot always uses WPA2; the network will be password protected. Publish the Wi-Fi password (e.g. on a sign or QR code) and keep accounts on the portal.")
-            : new DiagnosticItem("Diag_Open", DiagnosticStatus.Info, "WPA2-Personal"));
+        if (lanShare)
+        {
+            var lanId = IcsShareManager.NormalizeGuid(settings.Wifi.LanAdapterId);
+            var lans = IcsShareManager.GetLanCandidates(settings.Wifi.WanAdapterId);
+            var lan = lans.FirstOrDefault(c => c.AdapterId.Equals(lanId, StringComparison.OrdinalIgnoreCase));
+            if (string.IsNullOrEmpty(lanId))
+                items.Add(new DiagnosticItem("Diag_Lan", DiagnosticStatus.Error, "Select a LAN adapter for the switch / MikroTik"));
+            else if (lan is null)
+                items.Add(new DiagnosticItem("Diag_Lan", DiagnosticStatus.Error, "Selected LAN adapter not found"));
+            else if (!lan.IsUp)
+                items.Add(new DiagnosticItem("Diag_Lan", DiagnosticStatus.Error, $"{lan.Name} is not connected"));
+            else
+                items.Add(new DiagnosticItem("Diag_Lan", DiagnosticStatus.Ok, $"{lan.Name} — {lan.Description}"));
 
-        if (settings.Wifi.Passphrase.Length is < 8 or > 63)
-            items.Add(new DiagnosticItem("Diag_Passphrase", DiagnosticStatus.Error, "Wi-Fi password must be 8–63 characters"));
+            if (lans.Count(c => c.IsUp) < 1)
+                items.Add(new DiagnosticItem("Diag_LanHint", DiagnosticStatus.Warning, "Need a second Ethernet (or USB Ethernet) from this PC to the MikroTik"));
+        }
+        else
+        {
+            items.Add(settings.Wifi.OpenNetwork
+                ? new DiagnosticItem("Diag_Open", DiagnosticStatus.Warning, "Windows Mobile Hotspot always uses WPA2; the network will be password protected. Publish the Wi-Fi password (e.g. on a sign or QR code) and keep accounts on the portal.")
+                : new DiagnosticItem("Diag_Open", DiagnosticStatus.Info, "WPA2-Personal"));
+
+            if (settings.Wifi.Passphrase.Length is < 8 or > 63)
+                items.Add(new DiagnosticItem("Diag_Passphrase", DiagnosticStatus.Error, "Wi-Fi password must be 8–63 characters"));
+        }
+
+        if (settings.Api.Enabled)
+        {
+            items.Add(string.IsNullOrWhiteSpace(settings.Api.Token) || settings.Api.Token.Length < 16
+                ? new DiagnosticItem("Diag_Api", DiagnosticStatus.Error, "Admin API enabled but token is missing (min 16 chars)")
+                : new DiagnosticItem("Diag_Api", DiagnosticStatus.Ok, $"{settings.Api.ListenAddress}:{settings.Api.Port}"));
+        }
 
         try
         {

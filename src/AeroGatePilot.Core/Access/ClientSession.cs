@@ -38,10 +38,13 @@ public sealed class ClientSession
 
     public double DownloadRateBps { get; internal set; }
     public double UploadRateBps { get; internal set; }
+    public int DownloadKbps => (int)Math.Round(DownloadRateBps * 8 / 1000.0);
+    public int UploadKbps => (int)Math.Round(UploadRateBps * 8 / 1000.0);
 
-    internal long FlushedDownload { get; set; }
-    internal long FlushedUpload { get; set; }
-    internal long FlushedSeconds { get; set; }
+    /// <summary>Bytes already written to the database for this session (live remainder = DownloadBytes - FlushedDownload).</summary>
+    public long FlushedDownload { get; internal set; }
+    public long FlushedUpload { get; internal set; }
+    public long FlushedSeconds { get; internal set; }
     internal long RateSampleDownload { get; set; }
     internal long RateSampleUpload { get; set; }
     internal DateTime RateSampleUtc { get; set; }

@@ -2,11 +2,11 @@ using System.Text.Json;
 
 namespace AeroGatePilot.Infrastructure.Network;
 
-public sealed record NetworkSnapshotData(DateTime TakenUtc, HotspotConfigSnapshot Hotspot);
+public sealed record NetworkSnapshotData(DateTime TakenUtc, HotspotConfigSnapshot? Hotspot);
 
 /// <summary>
 /// Persists the hotspot state found before AeroGate Pilot took over, so it can be restored on Stop,
-/// on exit, or on the next launch after a crash.
+/// on exit, or on the next launch after a crash. LanShare snapshots may omit Hotspot.
 /// </summary>
 public sealed class NetworkSnapshot
 {
@@ -48,8 +48,15 @@ public sealed class NetworkSnapshot
 
         try
         {
-            await HotspotManager.RestoreAsync(data.Hotspot);
-            log.Info($"Restored previous Mobile Hotspot settings (\"{data.Hotspot.Ssid}\").");
+            if (data.Hotspot is not null)
+            {
+                await HotspotManager.RestoreAsync(data.Hotspot);
+                log.Info($"Restored previous Mobile Hotspot settings (\"{data.Hotspot.Ssid}\").");
+            }
+            else
+            {
+                log.Info("Cleared LAN-share session snapshot.");
+            }
             Clear();
             return true;
         }

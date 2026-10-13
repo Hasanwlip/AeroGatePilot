@@ -40,7 +40,7 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Internet source + Wi-Fi -->
+                <!-- Internet source + Wi-Fi / LAN -->
                 <StackPanel>
                     <Border Style="{StaticResource Card}">
                         <StackPanel>
@@ -48,14 +48,35 @@
                                 <Button DockPanel.Dock="Right" Style="{StaticResource SmallButton}" Command="{Binding RefreshCommand}" VerticalAlignment="Top">
                                     <TextBlock Text="&#xE72C;" FontFamily="Segoe MDL2 Assets" />
                                 </Button>
-                                <TextBlock Text="{l:T Net_Wan}" Style="{StaticResource CardTitle}" />
+                                <TextBlock Text="{l:T Net_Mode}" Style="{StaticResource CardTitle}" />
                             </DockPanel>
+                            <Border Background="{StaticResource FieldBrush}" CornerRadius="12" Padding="2" Margin="0,0,0,12">
+                                <UniformGrid Columns="2">
+                                    <RadioButton Style="{StaticResource Segment}" GroupName="GwMode" Content="{l:T Net_ModeHotspot}" HorizontalContentAlignment="Center"
+                                                 IsChecked="{Binding GatewayMode, Converter={StaticResource EnumMatch}, ConverterParameter=MobileHotspot}" />
+                                    <RadioButton Style="{StaticResource Segment}" GroupName="GwMode" Content="{l:T Net_ModeLan}" HorizontalContentAlignment="Center"
+                                                 IsChecked="{Binding GatewayMode, Converter={StaticResource EnumMatch}, ConverterParameter=LanShare}" />
+                                </UniformGrid>
+                            </Border>
+                            <TextBlock Text="{l:T Net_Wan}" Style="{StaticResource Label}" />
                             <ComboBox ItemsSource="{Binding WanOptions}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Wifi.WanAdapterId}" />
                             <TextBlock Text="{l:T Net_WanHint}" Style="{StaticResource Hint}" />
                         </StackPanel>
                     </Border>
 
-                    <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0" Visibility="{Binding IsLanShareMode, Converter={StaticResource Visible}}">
+                        <StackPanel>
+                            <TextBlock Text="{l:T Net_Lan}" Style="{StaticResource CardTitle}" />
+                            <TextBlock Text="{l:T Net_LanHint}" Style="{StaticResource Hint}" Margin="0,0,0,10" />
+                            <TextBlock Text="{l:T Net_LanAdapter}" Style="{StaticResource Label}" />
+                            <ComboBox ItemsSource="{Binding LanOptions}" DisplayMemberPath="Label" SelectedValuePath="Value" SelectedValue="{Binding Wifi.LanAdapterId}" />
+                            <Border Background="#2200CEC9" BorderBrush="#6600CEC9" BorderThickness="1" CornerRadius="12" Padding="12,10" Margin="0,12,0,0">
+                                <TextBlock Text="{l:T Net_LanGuide}" TextWrapping="Wrap" FontSize="12.5" />
+                            </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0" Visibility="{Binding IsHotspotMode, Converter={StaticResource Visible}}">
                         <StackPanel>
                             <TextBlock Text="{l:T Net_Wifi}" Style="{StaticResource CardTitle}" />
 
@@ -76,6 +97,53 @@
                                     Visibility="{Binding OpenNetwork, Converter={StaticResource Visible}}">
                                 <TextBlock Text="{l:T Net_OpenWarning}" TextWrapping="Wrap" FontSize="12.5" />
                             </Border>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                        <StackPanel>
+                            <TextBlock Text="{l:T Api_Title}" Style="{StaticResource CardTitle}" />
+                            <CheckBox Style="{StaticResource Toggle}" Content="{l:T Api_Enable}" IsChecked="{Binding Api.Enabled}" />
+                            <TextBlock Text="{l:T Api_Hint}" Style="{StaticResource Hint}" Margin="54,6,0,10" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="110" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="{l:T Api_Listen}" Style="{StaticResource Label}" />
+                                    <TextBox Text="{Binding Api.ListenAddress, UpdateSourceTrigger=PropertyChanged}" FlowDirection="LeftToRight" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="{l:T Api_Port}" Style="{StaticResource Label}" />
+                                    <TextBox Text="{Binding Api.Port, UpdateSourceTrigger=PropertyChanged}" FlowDirection="LeftToRight" />
+                                </StackPanel>
+                            </Grid>
+                            <TextBlock Text="{l:T Api_Token}" Style="{StaticResource Label}" Margin="0,14,0,6" />
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Margin="8,0,0,0" Content="{l:T Btn_Generate}" Command="{Binding GenerateApiTokenCommand}" />
+                                <TextBox Text="{Binding Api.Token, UpdateSourceTrigger=PropertyChanged}" FontFamily="{StaticResource MonoFont}" FlowDirection="LeftToRight" />
+                            </DockPanel>
+                            <TextBlock Style="{StaticResource Hint}" Margin="0,10,0,0" FlowDirection="LeftToRight">
+                                <Run Text="{l:T Api_Base}" />
+                                <Run Text=" " />
+                                <Run Text="{Binding ApiBaseUrl, Mode=OneWay}" />
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource Card}" Margin="0,16,0,0">
+                        <StackPanel>
+                            <TextBlock Text="{l:T Wh_Title}" Style="{StaticResource CardTitle}" />
+                            <CheckBox Style="{StaticResource Toggle}" Content="{l:T Wh_Enable}" IsChecked="{Binding Webhook.Enabled}" />
+                            <TextBlock Text="{l:T Wh_Hint}" Style="{StaticResource Hint}" Margin="54,6,0,10" />
+                            <TextBlock Text="{l:T Wh_Url}" Style="{StaticResource Label}" />
+                            <TextBox Text="{Binding Webhook.Url, UpdateSourceTrigger=PropertyChanged}" FlowDirection="LeftToRight" />
+                            <TextBlock Text="{l:T Wh_Secret}" Style="{StaticResource Label}" Margin="0,14,0,6" />
+                            <TextBox Text="{Binding Webhook.Secret, UpdateSourceTrigger=PropertyChanged}" FontFamily="{StaticResource MonoFont}" FlowDirection="LeftToRight" />
+                            <CheckBox Style="{StaticResource Toggle}" Content="{l:T Wh_OnFlush}" IsChecked="{Binding Webhook.OnFlush}" Margin="0,14,0,0" />
+                            <CheckBox Style="{StaticResource Toggle}" Content="{l:T Wh_OnEnd}" IsChecked="{Binding Webhook.OnSessionEnd}" Margin="0,8,0,0" />
                         </StackPanel>
                     </Border>
                 </StackPanel>

@@ -5,6 +5,7 @@ using AeroGatePilot.Core.Filtering;
 using AeroGatePilot.Core.Models;
 using AeroGatePilot.Core.Net;
 using AeroGatePilot.Core.Proxy;
+using AeroGatePilot.Infrastructure.Api;
 using AeroGatePilot.Infrastructure.Data;
 using AeroGatePilot.Infrastructure.Network;
 using AeroGatePilot.Infrastructure.Proxy;
@@ -22,8 +23,8 @@ public enum GatewayState
 }
 
 /// <summary>
-/// Turns this PC into a captive-portal gateway: Ethernet (WAN) is shared over Windows Mobile Hotspot (Wi-Fi),
-/// ICS provides NAT/DHCP/DNS, the portal authenticates users and the packet filter enforces access and quotas.
+/// Turns this PC into a captive-portal gateway: Ethernet (WAN) is shared over Windows Mobile Hotspot
+/// or a LAN NIC (switch / MikroTik / APs). ICS provides NAT/DHCP/DNS; portal + packet filter enforce access.
 /// </summary>
 public sealed class GatewayEngine : IPortalBackend, IAsyncDisposable
 {
@@ -31,15 +32,19 @@ public sealed class GatewayEngine : IPortalBackend, IAsyncDisposable
     private readonly SettingsStore _settings;
     private readonly AppLog _log;
     private readonly HotspotManager _hotspot = new();
+    private readonly IcsShareManager _icsShare = new();
     private readonly NetworkSnapshot _snapshot;
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
     private readonly HostAddressCache _names = new();
     private readonly RedirectTable _redirects = new();
+    private readonly WebhookClient _webhook;
+    private readonly AdminApiServer _api;
     private PortalServer? _portal;
     private PacketFilter? _filter;
     private TransparentRelay? _relay;
     private XrayCoreHost? _xray;
     private Timer? _timer;
+    private GatewayMode _activeMode = GatewayMode.MobileHotspot;
 
     public GatewayEngine(AppPaths paths, SettingsStore settings, SqliteStore store, AppLog log)
     {
@@ -49,9 +54,17 @@ public sealed class GatewayEngine : IPortalBackend, IAsyncDisposable
         Store = store;
         _snapshot = new NetworkSnapshot(paths.SnapshotFile);
         Xray = new XrayCoreHost(XrayCoreHost.DefaultCoreDirectory, paths.CoreDataDirectory, log);
+        _webhook = new WebhookClient(log);
         Sessions = new SessionManager(store);
         Sessions.SessionStarted += s => _log.Success($"{s.User.Username} signed in from {IpUtil.Format(s.Ip)} {s.Mac}".TrimEnd());
-        Sessions.SessionEnded += (s, reason) => _log.Info($"{s.User.Username} ({IpUtil.Format(s.Ip)}) disconnected: {reason} — {Formatting.Bytes(s.DownloadBytes + s.UploadBytes)} used");
+        Sessions.SessionEnded += (s, reason) =>
+        {
+            _log.Info($"{s.User.Username} ({IpUtil.Format(s.Ip)}) disconnected: {reason} — {Formatting.Bytes(s.DownloadBytes + s.UploadBytes)} used");
+            _webhook.NotifySessionEnd(s.User.Username, s.DownloadBytes, s.UploadBytes, s.User.UsedTotalBytes, IpUtil.Format(s.Ip), s.Mac, reason.ToString());
+        };
+        Sessions.UsageFlushed += (s, _, _, _) =>
+            _webhook.NotifyFlush(s.User.Username, s.User.UsedDownloadBytes, s.User.UsedUploadBytes, s.User.UsedTotalBytes, IpUtil.Format(s.Ip), s.Mac);
+        _api = new AdminApiServer(this, store, log);
     }
 
     public SqliteStore Store { get; }
@@ -64,11 +77,13 @@ public sealed class GatewayEngine : IPortalBackend, IAsyncDisposable
     public DateTime? StartedUtc { get; private set; }
     public PacketFilterStats? FilterStats => _filter?.Stats;
     public XrayCoreHost Xray { get; }
+    public AdminApiServer Api => _api;
     public bool VpnRelayActive => _relay is not null;
     public long VpnActiveConnections => _relay?.ActiveConnections ?? 0;
     public long VpnFailedConnections => _relay?.FailedConnections ?? 0;
-    public int HotspotClientCount => _hotspot.ClientCount;
+    public int HotspotClientCount => _activeMode == GatewayMode.MobileHotspot ? _hotspot.ClientCount : Sessions.Count;
     public IReadOnlyList<HotspotClient> HotspotClients => _hotspot.GetClients();
+    public GatewayMode ActiveMode => _activeMode;
 
     public event Action? StateChanged;
 
@@ -126,27 +141,65 @@ public sealed class GatewayEngine : IPortalBackend, IAsyncDisposable
             var settings = _settings.Current;
 
             Validate(settings);
+            _webhook.Configure(settings.Webhook);
+            _activeMode = settings.Wifi.Mode;
 
             var profile = HotspotManager.FindProfile(settings.Wifi.WanAdapterId)
                           ?? throw new InvalidOperationException("No internet connection found to share. Connect the Ethernet cable and try again.");
             WanName = profile.ProfileName;
 
-            if (!_snapshot.Exists)
-                _snapshot.Save(new NetworkSnapshotData(DateTime.UtcNow, _hotspot.Capture(profile)));
+            IPAddress gateway;
+            (System.Net.NetworkInformation.NetworkInterface Interface, int PrefixLength) nic;
 
-            if (settings.Wifi.OpenNetwork)
-                _log.Warn("Open (password-less) Wi-Fi is not supported by Windows Mobile Hotspot; WPA2 is used instead.");
+            if (_activeMode == GatewayMode.LanShare)
+            {
+                var wanId = IcsShareManager.ResolveWanAdapterId(settings.Wifi.WanAdapterId)
+                            ?? throw new InvalidOperationException("Could not resolve the WAN adapter id.");
+                if (!_snapshot.Exists)
+                    _snapshot.Save(new NetworkSnapshotData(DateTime.UtcNow, null));
 
-            _log.Info($"Starting Mobile Hotspot \"{settings.Wifi.Ssid}\" sharing \"{WanName}\"…");
-            await _hotspot.StartAsync(profile, settings.Wifi);
+                _log.Info($"Starting LAN share: \"{WanName}\" → LAN adapter (switch / MikroTik / APs)…");
+                await Task.Run(() => _icsShare.Start(wanId, settings.Wifi.LanAdapterId, _log));
 
-            var gateway = NetworkDiagnostics.IcsGatewayAddress();
-            var nic = await WaitForInterfaceAsync(gateway, TimeSpan.FromSeconds(60))
+                gateway = NetworkDiagnostics.IcsGatewayAddress();
+                nic = await WaitForInterfaceAsync(gateway, TimeSpan.FromSeconds(60)
+                      ) ?? throw new InvalidOperationException(
+                        $"LAN sharing started but the shared interface ({gateway}) did not come up. Check the LAN cable to the switch / MikroTik.");
+                _log.Info($"LAN interface \"{nic.Interface.Description}\" is up at {gateway}/{nic.PrefixLength}.");
+
+                if (!await IcsRepair.WaitUntilServingAsync(gateway, TimeSpan.FromSeconds(25)))
+                {
+                    _log.Warn("ICS DHCP did not start — clearing and retrying LAN share…");
+                    _icsShare.Stop(_log);
+                    await Task.Run(IcsRepair.RestartSharingService);
+                    await Task.Run(() => _icsShare.Start(wanId, settings.Wifi.LanAdapterId, _log));
+                    nic = await WaitForInterfaceAsync(gateway, TimeSpan.FromSeconds(45))
+                          ?? throw new InvalidOperationException($"After repairing ICS the LAN interface ({gateway}) did not come up.");
+                    if (!await IcsRepair.WaitUntilServingAsync(gateway, TimeSpan.FromSeconds(30)))
+                        throw new InvalidOperationException(
+                            "Windows Internet Connection Sharing did not start DHCP on the LAN adapter. Restart Windows and try again.");
+                    _log.Success("LAN Internet Connection Sharing repaired.");
+                }
+            }
+            else
+            {
+                if (!_snapshot.Exists)
+                    _snapshot.Save(new NetworkSnapshotData(DateTime.UtcNow, _hotspot.Capture(profile)));
+
+                if (settings.Wifi.OpenNetwork)
+                    _log.Warn("Open (password-less) Wi-Fi is not supported by Windows Mobile Hotspot; WPA2 is used instead.");
+
+                _log.Info($"Starting Mobile Hotspot \"{settings.Wifi.Ssid}\" sharing \"{WanName}\"…");
+                await _hotspot.StartAsync(profile, settings.Wifi);
+
+                gateway = NetworkDiagnostics.IcsGatewayAddress();
+                nic = await WaitForInterfaceAsync(gateway, TimeSpan.FromSeconds(60))
                       ?? throw new InvalidOperationException($"The hotspot started but its interface ({gateway}) did not come up within 60 seconds. Check that Mobile Hotspot can be turned on in Windows Settings.");
-            _log.Info($"Hotspot interface \"{nic.Interface.Description}\" is up at {gateway}/{nic.PrefixLength}.");
+                _log.Info($"Hotspot interface \"{nic.Interface.Description}\" is up at {gateway}/{nic.PrefixLength}.");
 
-            if (!await IcsRepair.WaitUntilServingAsync(gateway, TimeSpan.FromSeconds(20)))
-                nic = await RepairSharingAsync(profile, settings.Wifi, gateway);
+                if (!await IcsRepair.WaitUntilServingAsync(gateway, TimeSpan.FromSeconds(20)))
+                    nic = await RepairSharingAsync(profile, settings.Wifi, gateway);
+            }
 
             GatewayAddress = gateway;
             Subnet = Ipv4Subnet.From(gateway, nic.PrefixLength);
@@ -201,10 +254,22 @@ public sealed class GatewayEngine : IPortalBackend, IAsyncDisposable
             _filter = new PacketFilter(Sessions, options, _log, _names, _redirects);
             _filter.Start();
 
+            try
+            {
+                await _api.StartAsync(settings.Api);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Admin API failed to start: {ex.Message}", ex);
+            }
+
             _timer = new Timer(_ => Tick(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
             StartedUtc = DateTime.UtcNow;
             SetState(GatewayState.Running);
-            _log.Success($"AeroGate is live — clients joining \"{settings.Wifi.Ssid}\" are sent to http://{gateway}/portal/");
+            if (_activeMode == GatewayMode.LanShare)
+                _log.Success($"AeroGate is live (LAN share) — clients behind MikroTik / APs are sent to http://{gateway}/portal/");
+            else
+                _log.Success($"AeroGate is live — clients joining \"{settings.Wifi.Ssid}\" are sent to http://{gateway}/portal/");
             return true;
         }
         catch (Exception ex)
@@ -309,11 +374,34 @@ public sealed class GatewayEngine : IPortalBackend, IAsyncDisposable
 
         try
         {
-            await _hotspot.StopAsync();
+            await _api.StopAsync();
         }
         catch (Exception ex)
         {
-            _log.Error("Stopping hotspot", ex);
+            _log.Error("Stopping Admin API", ex);
+        }
+
+        if (_activeMode == GatewayMode.LanShare)
+        {
+            try
+            {
+                _icsShare.Stop(_log);
+            }
+            catch (Exception ex)
+            {
+                _log.Error("Stopping LAN share", ex);
+            }
+        }
+        else
+        {
+            try
+            {
+                await _hotspot.StopAsync();
+            }
+            catch (Exception ex)
+            {
+                _log.Error("Stopping hotspot", ex);
+            }
         }
 
         if (_snapshot.Exists)
@@ -342,14 +430,40 @@ public sealed class GatewayEngine : IPortalBackend, IAsyncDisposable
             throw new InvalidOperationException("Administrator rights are required. Restart AeroGate Pilot with \"Run as administrator\".");
         if (!WinDivertNative.IsAvailable(out var error))
             throw new InvalidOperationException(error);
-        if (string.IsNullOrWhiteSpace(settings.Wifi.Ssid) || settings.Wifi.Ssid.Length > 32)
-            throw new InvalidOperationException("The Wi-Fi name (SSID) must be 1–32 characters.");
-        if (settings.Wifi.Passphrase.Length is < 8 or > 63)
-            throw new InvalidOperationException("The Wi-Fi password must be 8–63 characters.");
+
+        if (settings.Wifi.Mode == GatewayMode.LanShare)
+        {
+            if (string.IsNullOrWhiteSpace(settings.Wifi.LanAdapterId))
+                throw new InvalidOperationException("Select the LAN adapter that connects to the switch / MikroTik (Network page → Gateway mode → LAN share).");
+            var wanId = IcsShareManager.ResolveWanAdapterId(settings.Wifi.WanAdapterId) ?? "";
+            if (wanId.Length > 0 && IcsShareManager.NormalizeGuid(settings.Wifi.LanAdapterId).Equals(wanId, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("WAN and LAN adapters must be different network cards.");
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(settings.Wifi.Ssid) || settings.Wifi.Ssid.Length > 32)
+                throw new InvalidOperationException("The Wi-Fi name (SSID) must be 1–32 characters.");
+            if (settings.Wifi.Passphrase.Length is < 8 or > 63)
+                throw new InvalidOperationException("The Wi-Fi password must be 8–63 characters.");
+        }
+
         if (settings.Portal.InternalPort is < 1024 or > 65535 || settings.Portal.InternalPort == 80)
             throw new InvalidOperationException("The portal port must be between 1024 and 65535.");
         if (!NetworkDiagnostics.IsPortFree(settings.Portal.InternalPort))
             throw new InvalidOperationException($"Portal port {settings.Portal.InternalPort} is already in use by another program.");
+
+        if (settings.Api.Enabled)
+        {
+            if (string.IsNullOrWhiteSpace(settings.Api.Token) || settings.Api.Token.Length < 16)
+                throw new InvalidOperationException("Admin API is enabled but the token is missing (min 16 characters).");
+            if (settings.Api.Port is < 1024 or > 65535 || settings.Api.Port == settings.Portal.InternalPort)
+                throw new InvalidOperationException("Admin API port must be 1024–65535 and different from the portal port.");
+            if (!NetworkDiagnostics.IsPortFree(settings.Api.Port))
+                throw new InvalidOperationException($"Admin API port {settings.Api.Port} is already in use.");
+        }
+
+        if (settings.Webhook.Enabled && string.IsNullOrWhiteSpace(settings.Webhook.Url))
+            throw new InvalidOperationException("Webhook is enabled but the URL is empty.");
 
         var upstream = settings.Upstream;
         if (upstream.Mode == UpstreamMode.BuiltInCore)
@@ -378,6 +492,8 @@ public sealed class GatewayEngine : IPortalBackend, IAsyncDisposable
     {
         await StopAsync();
         await Xray.DisposeAsync();
+        await _webhook.DisposeAsync();
+        await _api.DisposeAsync();
         _lifecycle.Dispose();
     }
 

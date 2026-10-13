@@ -40,10 +40,12 @@ public sealed class SessionManager
     }
 
     /// <summary>How often usage is written to the database and account/plan edits are picked up.</summary>
-    public TimeSpan FlushInterval { get; set; } = TimeSpan.FromSeconds(10);
+    public TimeSpan FlushInterval { get; set; } = TimeSpan.FromSeconds(1);
 
     public event Action<ClientSession>? SessionStarted;
     public event Action<ClientSession, AccessDenyReason>? SessionEnded;
+    /// <summary>Raised after usage counters are persisted for a live session (or on session end flush).</summary>
+    public event Action<ClientSession, long, long, long>? UsageFlushed;
 
     public IReadOnlyList<ClientSession> Sessions => _sessions.Values.ToArray();
     public int Count => _sessions.Count;
@@ -268,13 +270,34 @@ public sealed class SessionManager
         if (dDown <= 0 && dUp <= 0 && dSec <= 0)
             return;
 
-        _store.AddUsage(session.User.Id, Math.Max(0, dDown), Math.Max(0, dUp), Math.Max(0, dSec));
-        session.User.UsedDownloadBytes += Math.Max(0, dDown);
-        session.User.UsedUploadBytes += Math.Max(0, dUp);
-        session.User.UsedSeconds += Math.Max(0, dSec);
+        var addDown = Math.Max(0, dDown);
+        var addUp = Math.Max(0, dUp);
+        var addSec = Math.Max(0, dSec);
+        _store.AddUsage(session.User.Id, addDown, addUp, addSec);
+        session.User.UsedDownloadBytes += addDown;
+        session.User.UsedUploadBytes += addUp;
+        session.User.UsedSeconds += addSec;
         session.FlushedDownload = download;
         session.FlushedUpload = upload;
         session.FlushedSeconds = seconds;
+        UsageFlushed?.Invoke(session, addDown, addUp, addSec);
+    }
+
+    /// <summary>Checks username/password and quota without creating a gateway session (for Admin API / external panels).</summary>
+    public (bool Ok, AccessDenyReason Reason, UserAccount? User, Plan? Plan, QuotaStatus? Quota) VerifyCredentials(string username, string password)
+    {
+        var user = _store.FindUserByName(username.Trim());
+        if (user is null || user.IsGuest || !user.Enabled || !PasswordHasher.Verify(password, user.PasswordHash))
+            return (false, AccessDenyReason.InvalidCredentials, null, null, null);
+
+        var plan = _store.GetPlan(user.PlanId);
+        if (plan is null)
+            return (false, AccessDenyReason.PlanMissing, user, null, null);
+
+        var quota = QuotaEvaluator.Evaluate(user, plan, _clock());
+        if (quota.Reason != AccessDenyReason.None)
+            return (false, quota.Reason, user, plan, quota);
+        return (true, AccessDenyReason.None, user, plan, quota);
     }
 
     private static long ElapsedSeconds(ClientSession session, DateTime now) =>
