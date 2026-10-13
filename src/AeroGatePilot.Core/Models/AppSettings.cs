@@ -30,6 +30,20 @@ public sealed class AppSettings
     public UpstreamProxySettings Upstream { get; set; } = new();
     public AdminApiSettings Api { get; set; } = new();
     public WebhookSettings Webhook { get; set; } = new();
+
+    /// <summary>Match text from DHCP option 82 (MikroTik circuit-id, often the port name) to a plan.</summary>
+    public List<ApZone> ApZones { get; set; } = [];
+}
+
+public sealed class ApZone
+{
+    public string Name { get; set; } = "";
+
+    /// <summary>Substring of the DHCP relay circuit-id / remote-id, for example <c>ether2</c> or <c>guest</c>.</summary>
+    public string Match { get; set; } = "";
+
+    /// <summary>Plan required on this access point. 0 means observe only.</summary>
+    public long PlanId { get; set; }
 }
 
 public sealed class AdminApiSettings
@@ -100,6 +114,9 @@ public sealed class UpstreamProxySettings
 
     /// <summary>Id of the selected share-link server when <see cref="Mode"/> is <see cref="UpstreamMode.BuiltInCore"/>.</summary>
     public string ActiveServerId { get; set; } = "";
+
+    /// <summary>Hosts that stay direct when VPN routing is on. <c>*.bank.com</c> covers the domain and its subdomains.</summary>
+    public string DirectDomains { get; set; } = "";
 
     public List<VpnServerProfile> Servers { get; set; } = [];
 

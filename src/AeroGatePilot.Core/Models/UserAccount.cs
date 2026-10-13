@@ -14,6 +14,9 @@ public sealed class UserAccount
     public long UsedSeconds { get; set; }
     public DateTime? FirstLoginUtc { get; set; }
     public DateTime? UsageUpdatedUtc { get; set; }
+
+    /// <summary>When set and still in the future, the account cannot sign in. Usage counters stay as they are.</summary>
+    public DateTime? PausedUntilUtc { get; set; }
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public string Notes { get; set; } = "";
 

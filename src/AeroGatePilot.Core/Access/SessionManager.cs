@@ -22,6 +22,8 @@ public sealed record PortalClientStatus(
     int DownloadKbps,
     int UploadKbps);
 
+public sealed record ApZoneMatch(string Name, long PlanId);
+
 public sealed class SessionManager
 {
     private const int MaxFailedAttempts = 5;
@@ -41,6 +43,9 @@ public sealed class SessionManager
 
     /// <summary>How often usage is written to the database and account/plan edits are picked up.</summary>
     public TimeSpan FlushInterval { get; set; } = TimeSpan.FromSeconds(1);
+
+    /// <summary>Access-point zone for a client MAC, from DHCP option 82. Null when the AP is unknown.</summary>
+    public Func<string, ApZoneMatch?>? ZoneForMac { get; set; }
 
     public event Action<ClientSession>? SessionStarted;
     public event Action<ClientSession, AccessDenyReason>? SessionEnded;
@@ -201,6 +206,10 @@ public sealed class SessionManager
             if (quota.Reason != AccessDenyReason.None)
                 return LoginResult.Fail(quota.Reason);
 
+            var zone = string.IsNullOrWhiteSpace(mac) ? null : ZoneForMac?.Invoke(mac);
+            if (zone is { PlanId: > 0 } && zone.PlanId != user.PlanId)
+                return LoginResult.Fail(AccessDenyReason.WrongAccessPoint);
+
             if (!string.IsNullOrWhiteSpace(mac))
             {
                 foreach (var sameDevice in _sessions.Values.Where(s => s.User.Id == user.Id && string.Equals(s.Mac, mac, StringComparison.OrdinalIgnoreCase)).ToList())
@@ -221,6 +230,7 @@ public sealed class SessionManager
             {
                 LastFlushUtc = now,
                 RateSampleUtc = now,
+                ApName = zone?.Name ?? "",
             };
             _sessions[key] = session;
             SessionStarted?.Invoke(session);

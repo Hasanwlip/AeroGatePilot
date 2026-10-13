@@ -242,6 +242,14 @@ public sealed class SqliteStore : IAccountStore
         return list;
     }
 
+    public void SetPausedUntil(long userId, DateTime? untilUtc)
+    {
+        if (untilUtc is null)
+            Execute("UPDATE users SET paused_until_utc = NULL WHERE id = $id", ("$id", userId));
+        else
+            Execute("UPDATE users SET paused_until_utc = $t WHERE id = $id", ("$t", ToDb(untilUtc.Value)), ("$id", userId));
+    }
+
     public void MarkFirstLogin(long userId, DateTime utc) =>
         Execute("UPDATE users SET first_login_utc = $t WHERE id = $id AND first_login_utc IS NULL", ("$t", ToDb(utc)), ("$id", userId));
 
@@ -368,6 +376,7 @@ public sealed class SqliteStore : IAccountStore
         AddColumnIfMissing(conn, "plans", "site_list", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(conn, "plans", "use_proxy", "INTEGER NOT NULL DEFAULT 0");
         AddColumnIfMissing(conn, "users", "usage_updated_utc", "TEXT NULL");
+        AddColumnIfMissing(conn, "users", "paused_until_utc", "TEXT NULL");
 
         using (var box = conn.CreateCommand())
         {
@@ -448,6 +457,7 @@ public sealed class SqliteStore : IAccountStore
             UsedSeconds = r.GetInt64(r.GetOrdinal("used_seconds")),
             FirstLoginUtc = r.IsDBNull(firstLogin) ? null : FromDb(r.GetString(firstLogin)),
             UsageUpdatedUtc = r.IsDBNull(r.GetOrdinal("usage_updated_utc")) ? null : FromDb(r.GetString(r.GetOrdinal("usage_updated_utc"))),
+            PausedUntilUtc = r.IsDBNull(r.GetOrdinal("paused_until_utc")) ? null : FromDb(r.GetString(r.GetOrdinal("paused_until_utc"))),
             CreatedUtc = FromDb(r.GetString(r.GetOrdinal("created_utc"))),
             Notes = r.GetString(r.GetOrdinal("notes")),
         };

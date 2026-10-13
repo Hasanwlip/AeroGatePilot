@@ -25,6 +25,7 @@ public sealed class ClientSession
     public uint IpKey { get; }
     public IPAddress Ip { get; }
     public string Mac { get; }
+    public string ApName { get; internal set; } = "";
     public DateTime StartedUtc { get; }
     public UserAccount User { get; internal set; }
     public Plan Plan { get; private set; }

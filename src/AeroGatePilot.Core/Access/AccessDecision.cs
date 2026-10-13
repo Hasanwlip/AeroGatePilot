@@ -17,6 +17,8 @@ public enum AccessDenyReason
     LoggedOut,
     KickedByAdmin,
     GatewayStopped,
+    Paused,
+    WrongAccessPoint,
 }
 
 public sealed record LoginResult(bool Success, AccessDenyReason Reason)

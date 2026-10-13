@@ -14,6 +14,9 @@ public sealed record PacketFilterOptions(uint GatewayIp, Ipv4Subnet Subnet, int 
     /// <summary>Port of the transparent VPN relay on the gateway; 0 when no upstream VPN is configured.</summary>
     public int RelayPort { get; init; }
 
+    /// <summary>Domains that stay off the VPN. Empty means every proxied user goes through the relay.</summary>
+    public string DirectDomains { get; init; } = "";
+
     /// <summary>Route every user through the VPN, not only plans that ask for it.</summary>
     public bool ProxyAllUsers { get; init; }
 }
@@ -71,19 +74,22 @@ public sealed class PacketFilter : IDisposable
     private readonly ConcurrentDictionary<FlowKey, FlowState> _flows = new();
     private readonly ConcurrentDictionary<string, long> _blockLogged = new();
     private readonly List<Thread> _threads = [];
+    private readonly ApDirectory? _aps;
     private WinDivertHandle? _forward;
     private WinDivertHandle? _local;
     private WinDivertHandle? _inject;
+    private WinDivertHandle? _dhcp;
     private volatile bool _running;
     private uint _hotspotIfIndex;
     private long _lastPrune = Environment.TickCount64;
 
-    public PacketFilter(SessionManager sessions, PacketFilterOptions options, AppLog log, HostAddressCache names, RedirectTable? redirects = null)
+    public PacketFilter(SessionManager sessions, PacketFilterOptions options, AppLog log, HostAddressCache names, RedirectTable? redirects = null, ApDirectory? accessPoints = null)
     {
         _sessions = sessions;
         _options = options;
         _log = log;
         _names = names;
+        _aps = accessPoints;
         _redirects = options.RelayPort > 0 ? redirects : null;
         _hotspotIfIndex = options.HotspotIfIndex;
     }
@@ -114,6 +120,7 @@ public sealed class PacketFilter : IDisposable
             _inject = WinDivertHandle.Open("false", WinDivertLayer.Network, 0, WinDivertOpenFlags.SendOnly);
             _forward = WinDivertHandle.Open(forwardFilter, WinDivertLayer.NetworkForward);
             _local = WinDivertHandle.Open(localFilter, WinDivertLayer.Network);
+            _dhcp = WinDivertHandle.Open("udp.DstPort == 67", WinDivertLayer.Network, 500, WinDivertOpenFlags.Sniff);
         }
         catch
         {
@@ -125,6 +132,7 @@ public sealed class PacketFilter : IDisposable
         for (var i = 0; i < ForwardWorkers; i++)
             StartThread($"AeroGate forward {i + 1}", ForwardLoop);
         StartThread("AeroGate local", LocalLoop);
+        StartThread("AeroGate dhcp", DhcpLoop);
         _log.Info($"Packet filter active on {_options.Subnet} (gateway {gw}).");
     }
 
@@ -133,6 +141,7 @@ public sealed class PacketFilter : IDisposable
         _running = false;
         _forward?.Shutdown();
         _local?.Shutdown();
+        _dhcp?.Shutdown();
         foreach (var thread in _threads)
             thread.Join(TimeSpan.FromSeconds(2));
         _threads.Clear();
@@ -144,9 +153,11 @@ public sealed class PacketFilter : IDisposable
         _forward?.Dispose();
         _local?.Dispose();
         _inject?.Dispose();
+        _dhcp?.Dispose();
         _forward = null;
         _local = null;
         _inject = null;
+        _dhcp = null;
     }
 
     private void StartThread(string name, Action body)
@@ -499,6 +510,8 @@ public sealed class PacketFilter : IDisposable
         var port = packet.DestinationPort;
         if (port is DnsPort or DnsOverTlsPort)
             return false;
+        if (VpnBypass.Matches(_options.DirectDomains, _names.NamesFor(server)))
+            return false;
         // Local networks behind this PC stay direct, unless DNS pointed a site name there (typical of DNS hijacking).
         return !IpUtil.IsPrivate(server) || _names.NamesFor(server).Count > 0;
     }
@@ -574,6 +587,33 @@ public sealed class PacketFilter : IDisposable
             SubIfIdx = 0,
         };
         return _inject.Send(packet, length, ref addr, recalcChecksums: true);
+    }
+
+    private void DhcpLoop()
+    {
+        var handle = _dhcp;
+        if (handle is null)
+            return;
+        var buffer = new byte[BufferSize];
+        var addr = new WinDivertAddress();
+        while (_running)
+        {
+            if (!handle.Receive(buffer, out var length, ref addr))
+            {
+                if (!_running)
+                    return;
+                continue;
+            }
+            if (_aps is null || !Ipv4Packet.TryParse(buffer.AsSpan(0, length), out var packet))
+                continue;
+            if (packet.Protocol != IpProtocol.Udp || !packet.HasPorts || packet.DestinationPort != DhcpServerPort)
+                continue;
+            if (!DhcpMessage.TryParse(packet.UdpData, out var info))
+                continue;
+            var label = DhcpMessage.Label(info);
+            if (label.Length > 0)
+                _aps.Observe(info.Mac, label);
+        }
     }
 
     private void PruneIfDue()

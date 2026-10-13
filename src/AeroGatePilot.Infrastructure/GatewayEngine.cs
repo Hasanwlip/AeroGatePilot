@@ -36,6 +36,7 @@ public sealed class GatewayEngine : IPortalBackend, IAsyncDisposable
     private readonly NetworkSnapshot _snapshot;
     private readonly SemaphoreSlim _lifecycle = new(1, 1);
     private readonly HostAddressCache _names = new();
+    private readonly ApDirectory _aps = new();
     private readonly RedirectTable _redirects = new();
     private readonly WebhookClient _webhook;
     private readonly AdminApiServer _api;
@@ -56,7 +57,8 @@ public sealed class GatewayEngine : IPortalBackend, IAsyncDisposable
         Xray = new XrayCoreHost(XrayCoreHost.DefaultCoreDirectory, paths.CoreDataDirectory, log);
         _webhook = new WebhookClient(log, store);
         Sessions = new SessionManager(store);
-        Sessions.SessionStarted += s => _log.Success($"{s.User.Username} signed in from {IpUtil.Format(s.Ip)} {s.Mac}".TrimEnd());
+        Sessions.ZoneForMac = mac => _aps.Match(mac, _settings.Current.ApZones);
+        Sessions.SessionStarted += s => _log.Success($"{s.User.Username} signed in from {IpUtil.Format(s.Ip)} {s.Mac} {s.ApName}".TrimEnd());
         Sessions.SessionEnded += (s, reason) =>
         {
             _log.Info($"{s.User.Username} ({IpUtil.Format(s.Ip)}) disconnected: {reason} — {Formatting.Bytes(s.DownloadBytes + s.UploadBytes)} used");
@@ -250,8 +252,9 @@ public sealed class GatewayEngine : IPortalBackend, IAsyncDisposable
                 HotspotIfIndex = (uint)nic.Interface.GetIPProperties().GetIPv4Properties().Index,
                 RelayPort = relayUpstream?.RelayPort ?? 0,
                 ProxyAllUsers = upstream.Scope == UpstreamProxyScope.AllUsers,
+                DirectDomains = upstream.DirectDomains ?? "",
             };
-            _filter = new PacketFilter(Sessions, options, _log, _names, _redirects);
+            _filter = new PacketFilter(Sessions, options, _log, _names, _redirects, _aps);
             _filter.Start();
 
             try
@@ -431,14 +434,15 @@ public sealed class GatewayEngine : IPortalBackend, IAsyncDisposable
             foreach (var (ip, mac) in LanNeighbors.List(subnet))
             {
                 var session = sessions.FirstOrDefault(s => IpUtil.Format(s.Ip) == ip);
-                byIp[ip] = new ObservedClient(ip, mac, session?.User.Username, session is not null);
+                var ap = session?.ApName ?? _aps.Match(mac, Settings.ApZones)?.Name ?? "";
+                byIp[ip] = new ObservedClient(ip, mac, session?.User.Username, session is not null, ap);
             }
         }
         foreach (var session in sessions)
         {
             var ip = IpUtil.Format(session.Ip);
             if (!byIp.ContainsKey(ip))
-                byIp[ip] = new ObservedClient(ip, session.Mac, session.User.Username, true);
+                byIp[ip] = new ObservedClient(ip, session.Mac, session.User.Username, true, session.ApName);
         }
         return byIp.Values.OrderBy(c => c.Ip).ToList();
     }

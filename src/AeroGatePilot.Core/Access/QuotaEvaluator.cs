@@ -51,6 +51,8 @@ public static class QuotaEvaluator
         var reason = AccessDenyReason.None;
         if (!user.Enabled)
             reason = AccessDenyReason.AccountDisabled;
+        else if (user.PausedUntilUtc is { } paused && nowUtc < paused)
+            reason = AccessDenyReason.Paused;
         else if (expires is { } e && nowUtc >= e)
             reason = AccessDenyReason.AccountExpired;
         else if (remainingBytes == 0)

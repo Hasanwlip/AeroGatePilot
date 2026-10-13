@@ -76,6 +76,7 @@ public sealed class NetworkViewModel : PageViewModel
     private string _vpnTestResult = "";
     private bool _vpnTestOk;
     private string _importText = "";
+    private string _apZoneText = "";
     private VpnServerRow? _selectedServer;
 
     public NetworkViewModel(AppServices services)
@@ -148,6 +149,12 @@ public sealed class NetworkViewModel : PageViewModel
     {
         get => _importText;
         set => Set(ref _importText, value);
+    }
+
+    public string ApZoneText
+    {
+        get => _apZoneText;
+        set => Set(ref _apZoneText, value);
     }
 
     public VpnServerRow? SelectedServer
@@ -331,6 +338,7 @@ public sealed class NetworkViewModel : PageViewModel
         PortalPort = settings.Portal.InternalPort;
         IsolateHost = settings.Portal.IsolateHost;
         Upstream = settings.Upstream;
+        ApZoneText = FormatZones(settings.ApZones);
         Servers.Clear();
         foreach (var server in _upstream.Servers)
             Servers.Add(new VpnServerRow(server));
@@ -602,6 +610,7 @@ public sealed class NetworkViewModel : PageViewModel
         settings.Portal.InternalPort = _portalPort;
         settings.Portal.IsolateHost = _isolateHost;
         settings.Upstream = _upstream;
+        settings.ApZones = ParseZones(_apZoneText);
         settings.Api = _api;
         settings.Webhook = _webhook;
         Services.Settings.Save(settings);
@@ -617,6 +626,26 @@ public sealed class NetworkViewModel : PageViewModel
         Raise(nameof(ApiBaseUrl));
         MessageIsError = false;
         Message = Loc.T(IsRunning ? "Net_RestartNotice" : "Msg_Saved");
+    }
+
+    private static string FormatZones(IEnumerable<ApZone> zones) =>
+        string.Join(Environment.NewLine, zones.Where(z => !string.IsNullOrWhiteSpace(z.Match))
+            .Select(z => z.PlanId > 0 ? $"{z.Name} | {z.Match} | {z.PlanId}" : $"{z.Name} | {z.Match}"));
+
+    private static List<ApZone> ParseZones(string text)
+    {
+        var list = new List<ApZone>();
+        foreach (var raw in text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = raw.Split('|', StringSplitOptions.TrimEntries);
+            if (parts.Length < 2 || parts[1].Length == 0)
+                continue;
+            long planId = 0;
+            if (parts.Length >= 3)
+                long.TryParse(parts[2], out planId);
+            list.Add(new ApZone { Name = parts[0], Match = parts[1], PlanId = planId });
+        }
+        return list;
     }
 
     private void Fail(string key)

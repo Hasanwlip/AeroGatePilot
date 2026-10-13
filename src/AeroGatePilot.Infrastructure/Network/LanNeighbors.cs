@@ -4,7 +4,7 @@ using AeroGatePilot.Core.Net;
 
 namespace AeroGatePilot.Infrastructure.Network;
 
-public sealed record ObservedClient(string Ip, string Mac, string? Username, bool LoggedIn);
+public sealed record ObservedClient(string Ip, string Mac, string? Username, bool LoggedIn, string Ap);
 
 /// <summary>Reads the Windows ARP/neighbor table so LAN clients show up before they sign in to the portal.</summary>
 public static class LanNeighbors

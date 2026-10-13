@@ -73,6 +73,10 @@
                             <Border Background="#2200CEC9" BorderBrush="#6600CEC9" BorderThickness="1" CornerRadius="12" Padding="12,10" Margin="0,12,0,0">
                                 <TextBlock Text="{l:T Net_LanGuide}" TextWrapping="Wrap" FontSize="12.5" />
                             </Border>
+                            <TextBlock Text="{l:T Ap_Title}" Style="{StaticResource Label}" Margin="0,14,0,6" />
+                            <TextBox Text="{Binding ApZoneText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap"
+                                     Height="72" VerticalContentAlignment="Top" FontFamily="{StaticResource MonoFont}" FlowDirection="LeftToRight" />
+                            <TextBlock Text="{l:T Ap_Hint}" Style="{StaticResource Hint}" />
                         </StackPanel>
                     </Border>
 
@@ -273,6 +277,10 @@
                                     </StackPanel>
                                 </Border>
                                 <CheckBox Style="{StaticResource Toggle}" Content="{l:T Vpn_Fallback}" IsChecked="{Binding Upstream.FallbackDirect}" Margin="0,14,0,0" />
+                                <TextBlock Text="{l:T Vpn_Direct}" Style="{StaticResource Label}" Margin="0,14,0,6" />
+                                <TextBox Text="{Binding Upstream.DirectDomains, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap"
+                                         Height="72" VerticalContentAlignment="Top" FontFamily="{StaticResource MonoFont}" FlowDirection="LeftToRight" />
+                                <TextBlock Text="{l:T Vpn_DirectHint}" Style="{StaticResource Hint}" />
                             </StackPanel>
                         </StackPanel>
                     </Border>

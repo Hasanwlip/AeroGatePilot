@@ -103,6 +103,29 @@ public sealed class AdminApiServer : IAsyncDisposable
                 return Results.Json(new { error = "not_found" }, JsonOptions, statusCode: 404);
             return Results.Json(_store.GetHistoryForUser(username).Select(HistoryDto), JsonOptions);
         });
+        app.MapPost("/api/v1/users/{username}/pause", async (string username, HttpRequest request) =>
+        {
+            var user = _store.FindUserByName(username);
+            if (user is null || user.IsGuest)
+                return Results.Json(new { error = "not_found" }, JsonOptions, statusCode: 404);
+            PauseBody? body = null;
+            if (request.ContentLength is > 0)
+                body = await JsonSerializer.DeserializeAsync<PauseBody>(request.Body, JsonOptions);
+            var until = body?.Until ?? DateTime.Today.AddDays(1).ToUniversalTime();
+            if (until.Kind == DateTimeKind.Unspecified)
+                until = DateTime.SpecifyKind(until, DateTimeKind.Local).ToUniversalTime();
+            _store.SetPausedUntil(user.Id, until);
+            var closed = _engine.KickUser(username);
+            return Results.Json(new { ok = true, username = user.Username, paused_until_utc = until, sessions_closed = closed }, JsonOptions);
+        });
+        app.MapPost("/api/v1/users/{username}/resume", (string username) =>
+        {
+            var user = _store.FindUserByName(username);
+            if (user is null || user.IsGuest)
+                return Results.Json(new { error = "not_found" }, JsonOptions, statusCode: 404);
+            _store.SetPausedUntil(user.Id, null);
+            return Results.Json(new { ok = true, username = user.Username }, JsonOptions);
+        });
         app.MapPost("/api/v1/users/{username}/kick", (string username) =>
         {
             var user = _store.FindUserByName(username);
@@ -260,6 +283,7 @@ public sealed class AdminApiServer : IAsyncDisposable
             used_upload_bytes = user.UsedUploadBytes + live.Up,
             used_total_bytes = user.UsedTotalBytes + live.Down + live.Up,
             used_seconds = user.UsedSeconds + live.Sec,
+        paused_until_utc = user.PausedUntilUtc,
             first_login_utc = user.FirstLoginUtc,
             created_utc = user.CreatedUtc,
             notes = user.Notes,
@@ -344,6 +368,7 @@ public sealed class AdminApiServer : IAsyncDisposable
         upload_bytes = session.UploadBytes,
         download_kbps = session.DownloadKbps,
         upload_kbps = session.UploadKbps,
+        ap = session.ApName,
     };
 
     private (long Down, long Up, long Sec, bool Online) LiveUsage(long userId)
@@ -405,6 +430,11 @@ public sealed class AdminApiServer : IAsyncDisposable
         public long? PlanId { get; set; }
         public bool? Enabled { get; set; }
         public string? Notes { get; set; }
+    }
+
+    private sealed class PauseBody
+    {
+        public DateTime? Until { get; set; }
     }
 
     private sealed class PlanBody
