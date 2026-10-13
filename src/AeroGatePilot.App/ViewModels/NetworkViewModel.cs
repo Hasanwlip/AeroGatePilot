@@ -525,6 +525,11 @@ public sealed class NetworkViewModel : PageViewModel
                 Fail("Msg_InvalidSsid");
                 return;
             }
+            if (_wifi.OpenNetwork)
+            {
+                Fail("Msg_OpenHotspot");
+                return;
+            }
             if (_wifi.Passphrase.Length is < 8 or > 63)
             {
                 Fail("Msg_InvalidPassphrase");

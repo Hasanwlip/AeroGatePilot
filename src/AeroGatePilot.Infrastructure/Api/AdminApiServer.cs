@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AeroGatePilot.Core.Access;
+using AeroGatePilot.Core.Filtering;
 using AeroGatePilot.Core.Models;
 using AeroGatePilot.Core.Net;
 using AeroGatePilot.Infrastructure.Data;
@@ -82,6 +83,59 @@ public sealed class AdminApiServer : IAsyncDisposable
             return Results.Json(UserDetailDto(user), JsonOptions);
         });
         app.MapGet("/api/v1/sessions", () => Results.Json(_engine.Sessions.Sessions.Select(SessionDto), JsonOptions));
+        app.MapGet("/api/v1/clients", () => Results.Json(_engine.ListObservedClients(), JsonOptions));
+        app.MapGet("/api/v1/usage", (HttpRequest request) =>
+        {
+            DateTime? since = null;
+            if (DateTime.TryParse(request.Query["since"], System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var parsed))
+                since = parsed.ToUniversalTime();
+            return Results.Json(new
+            {
+                since,
+                users = _store.GetUsageSince(since).Select(UserDto),
+            }, JsonOptions);
+        });
+        app.MapGet("/api/v1/users/{username}/history", (string username) =>
+        {
+            var user = _store.FindUserByName(username);
+            if (user is null || user.IsGuest)
+                return Results.Json(new { error = "not_found" }, JsonOptions, statusCode: 404);
+            return Results.Json(_store.GetHistoryForUser(username).Select(HistoryDto), JsonOptions);
+        });
+        app.MapPost("/api/v1/users/{username}/kick", (string username) =>
+        {
+            var user = _store.FindUserByName(username);
+            if (user is null || user.IsGuest)
+                return Results.Json(new { error = "not_found" }, JsonOptions, statusCode: 404);
+            var kicked = _engine.KickUser(username);
+            return Results.Json(new { ok = true, username = user.Username, sessions_closed = kicked }, JsonOptions);
+        });
+        app.MapGet("/api/v1/plans", () => Results.Json(_store.GetPlans().Select(PlanDto), JsonOptions));
+        app.MapPost("/api/v1/plans", async (HttpRequest request) =>
+        {
+            var body = await JsonSerializer.DeserializeAsync<PlanBody>(request.Body, JsonOptions);
+            if (body is null || string.IsNullOrWhiteSpace(body.Name))
+                return Results.Json(new { error = "name_required" }, JsonOptions, statusCode: 400);
+            var saved = _store.SavePlan(ApplyPlan(new Plan(), body));
+            return Results.Json(PlanDto(saved), JsonOptions, statusCode: 201);
+        });
+        app.MapMethods("/api/v1/plans/{id:long}", ["PATCH"], async (long id, HttpRequest request) =>
+        {
+            var plan = _store.GetPlan(id);
+            if (plan is null)
+                return Results.Json(new { error = "not_found" }, JsonOptions, statusCode: 404);
+            var body = await JsonSerializer.DeserializeAsync<PlanBody>(request.Body, JsonOptions) ?? new();
+            return Results.Json(PlanDto(_store.SavePlan(ApplyPlan(plan, body))), JsonOptions);
+        });
+        app.MapDelete("/api/v1/plans/{id:long}", (long id) =>
+        {
+            if (_store.GetPlan(id) is null)
+                return Results.Json(new { error = "not_found" }, JsonOptions, statusCode: 404);
+            if (!_store.DeletePlan(id))
+                return Results.Json(new { error = "plan_in_use" }, JsonOptions, statusCode: 409);
+            return Results.Json(new { ok = true }, JsonOptions);
+        });
         app.MapPost("/api/v1/auth/verify", async (HttpRequest request) =>
         {
             var body = await JsonSerializer.DeserializeAsync<AuthVerifyBody>(request.Body, JsonOptions);
@@ -224,6 +278,62 @@ public sealed class AdminApiServer : IAsyncDisposable
         };
     }
 
+    private static object HistoryDto(SessionHistoryEntry entry) => new
+    {
+        id = entry.Id,
+        username = entry.Username,
+        ip = entry.Ip,
+        mac = entry.Mac,
+        started_utc = entry.StartedUtc,
+        ended_utc = entry.EndedUtc,
+        download_bytes = entry.DownloadBytes,
+        upload_bytes = entry.UploadBytes,
+        end_reason = entry.EndReason,
+    };
+
+    private static object PlanDto(Plan plan) => new
+    {
+        id = plan.Id,
+        name = plan.Name,
+        data_limit_mb = plan.DataLimitMb,
+        time_limit_minutes = plan.TimeLimitMinutes,
+        session_limit_minutes = plan.SessionLimitMinutes,
+        validity_days = plan.ValidityDays,
+        download_kbps = plan.DownloadKbps,
+        upload_kbps = plan.UploadKbps,
+        max_devices = plan.MaxDevices,
+        site_filter = plan.SiteFilter.ToString(),
+        site_list = plan.SiteList,
+        use_proxy = plan.UseUpstreamProxy,
+    };
+
+    private static Plan ApplyPlan(Plan plan, PlanBody body)
+    {
+        if (!string.IsNullOrWhiteSpace(body.Name))
+            plan.Name = body.Name.Trim();
+        if (body.DataLimitMb is { } data)
+            plan.DataLimitMb = data;
+        if (body.TimeLimitMinutes is { } time)
+            plan.TimeLimitMinutes = time;
+        if (body.SessionLimitMinutes is { } session)
+            plan.SessionLimitMinutes = session;
+        if (body.ValidityDays is { } days)
+            plan.ValidityDays = days;
+        if (body.DownloadKbps is { } down)
+            plan.DownloadKbps = down;
+        if (body.UploadKbps is { } up)
+            plan.UploadKbps = up;
+        if (body.MaxDevices is { } devices)
+            plan.MaxDevices = devices;
+        if (!string.IsNullOrWhiteSpace(body.SiteFilter) && Enum.TryParse<SiteFilterMode>(body.SiteFilter, true, out var filter))
+            plan.SiteFilter = filter;
+        if (body.SiteList is not null)
+            plan.SiteList = body.SiteList;
+        if (body.UseProxy is { } proxy)
+            plan.UseUpstreamProxy = proxy;
+        return plan;
+    }
+
     private static object SessionDto(ClientSession session) => new
     {
         username = session.User.Username,
@@ -295,6 +405,21 @@ public sealed class AdminApiServer : IAsyncDisposable
         public long? PlanId { get; set; }
         public bool? Enabled { get; set; }
         public string? Notes { get; set; }
+    }
+
+    private sealed class PlanBody
+    {
+        public string? Name { get; set; }
+        public long? DataLimitMb { get; set; }
+        public int? TimeLimitMinutes { get; set; }
+        public int? SessionLimitMinutes { get; set; }
+        public int? ValidityDays { get; set; }
+        public int? DownloadKbps { get; set; }
+        public int? UploadKbps { get; set; }
+        public int? MaxDevices { get; set; }
+        public string? SiteFilter { get; set; }
+        public string? SiteList { get; set; }
+        public bool? UseProxy { get; set; }
     }
 
     private sealed class PatchUserBody

@@ -54,7 +54,7 @@ public sealed class GatewayEngine : IPortalBackend, IAsyncDisposable
         Store = store;
         _snapshot = new NetworkSnapshot(paths.SnapshotFile);
         Xray = new XrayCoreHost(XrayCoreHost.DefaultCoreDirectory, paths.CoreDataDirectory, log);
-        _webhook = new WebhookClient(log);
+        _webhook = new WebhookClient(log, store);
         Sessions = new SessionManager(store);
         Sessions.SessionStarted += s => _log.Success($"{s.User.Username} signed in from {IpUtil.Format(s.Ip)} {s.Mac}".TrimEnd());
         Sessions.SessionEnded += (s, reason) =>
@@ -412,11 +412,43 @@ public sealed class GatewayEngine : IPortalBackend, IAsyncDisposable
         StartedUtc = null;
     }
 
+    public int KickUser(string username)
+    {
+        var user = Store.FindUserByName(username);
+        if (user is null || user.IsGuest)
+            return 0;
+        var count = Sessions.Sessions.Count(s => s.User.Id == user.Id);
+        Sessions.EndUserSessions(user.Id, AccessDenyReason.KickedByAdmin);
+        return count;
+    }
+
+    public IReadOnlyList<ObservedClient> ListObservedClients()
+    {
+        var sessions = Sessions.Sessions.ToList();
+        var byIp = new Dictionary<string, ObservedClient>(StringComparer.OrdinalIgnoreCase);
+        if (Subnet is { } subnet)
+        {
+            foreach (var (ip, mac) in LanNeighbors.List(subnet))
+            {
+                var session = sessions.FirstOrDefault(s => IpUtil.Format(s.Ip) == ip);
+                byIp[ip] = new ObservedClient(ip, mac, session?.User.Username, session is not null);
+            }
+        }
+        foreach (var session in sessions)
+        {
+            var ip = IpUtil.Format(session.Ip);
+            if (!byIp.ContainsKey(ip))
+                byIp[ip] = new ObservedClient(ip, session.Mac, session.User.Username, true);
+        }
+        return byIp.Values.OrderBy(c => c.Ip).ToList();
+    }
+
     private void Tick()
     {
         try
         {
             Sessions.Tick();
+            _ = _webhook.DrainAsync();
         }
         catch (Exception ex)
         {
@@ -443,6 +475,9 @@ public sealed class GatewayEngine : IPortalBackend, IAsyncDisposable
         {
             if (string.IsNullOrWhiteSpace(settings.Wifi.Ssid) || settings.Wifi.Ssid.Length > 32)
                 throw new InvalidOperationException("The Wi-Fi name (SSID) must be 1–32 characters.");
+            if (settings.Wifi.OpenNetwork)
+                throw new InvalidOperationException(
+                    "Windows Mobile Hotspot cannot broadcast an open (password-less) network. Use LAN share and set each modem SSID to Open. Phones connect with no Wi-Fi password and still sign in on the portal.");
             if (settings.Wifi.Passphrase.Length is < 8 or > 63)
                 throw new InvalidOperationException("The Wi-Fi password must be 8–63 characters.");
         }

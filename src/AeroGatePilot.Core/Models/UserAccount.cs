@@ -13,6 +13,7 @@ public sealed class UserAccount
     public long UsedUploadBytes { get; set; }
     public long UsedSeconds { get; set; }
     public DateTime? FirstLoginUtc { get; set; }
+    public DateTime? UsageUpdatedUtc { get; set; }
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public string Notes { get; set; } = "";
 

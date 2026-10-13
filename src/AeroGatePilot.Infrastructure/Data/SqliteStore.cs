@@ -208,8 +208,39 @@ public sealed class SqliteStore : IAccountStore
 
     public void AddUsage(long userId, long downloadBytes, long uploadBytes, long seconds) =>
         Execute(
-            "UPDATE users SET used_download = used_download + $d, used_upload = used_upload + $u, used_seconds = used_seconds + $s WHERE id = $id",
-            ("$d", downloadBytes), ("$u", uploadBytes), ("$s", seconds), ("$id", userId));
+            "UPDATE users SET used_download = used_download + $d, used_upload = used_upload + $u, used_seconds = used_seconds + $s, usage_updated_utc = $t WHERE id = $id",
+            ("$d", downloadBytes), ("$u", uploadBytes), ("$s", seconds), ("$id", userId), ("$t", ToDb(DateTime.UtcNow)));
+
+    /// <summary>Accounts whose stored usage changed at or after <paramref name="sinceUtc"/>. Null returns every non-guest account.</summary>
+    public IReadOnlyList<UserAccount> GetUsageSince(DateTime? sinceUtc)
+    {
+        using var conn = Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = sinceUtc is null
+            ? "SELECT * FROM users WHERE is_guest = 0 ORDER BY username COLLATE NOCASE"
+            : "SELECT * FROM users WHERE is_guest = 0 AND usage_updated_utc IS NOT NULL AND usage_updated_utc >= $since ORDER BY usage_updated_utc";
+        if (sinceUtc is not null)
+            cmd.Parameters.AddWithValue("$since", ToDb(sinceUtc.Value));
+        using var reader = cmd.ExecuteReader();
+        var list = new List<UserAccount>();
+        while (reader.Read())
+            list.Add(ReadUser(reader));
+        return list;
+    }
+
+    public IReadOnlyList<SessionHistoryEntry> GetHistoryForUser(string username, int limit = 100)
+    {
+        using var conn = Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT * FROM session_history WHERE username = $u COLLATE NOCASE ORDER BY id DESC LIMIT $limit";
+        cmd.Parameters.AddWithValue("$u", username);
+        cmd.Parameters.AddWithValue("$limit", limit);
+        using var reader = cmd.ExecuteReader();
+        var list = new List<SessionHistoryEntry>();
+        while (reader.Read())
+            list.Add(ReadHistory(reader));
+        return list;
+    }
 
     public void MarkFirstLogin(long userId, DateTime utc) =>
         Execute("UPDATE users SET first_login_utc = $t WHERE id = $id AND first_login_utc IS NULL", ("$t", ToDb(utc)), ("$id", userId));
@@ -262,21 +293,7 @@ public sealed class SqliteStore : IAccountStore
         using var reader = cmd.ExecuteReader();
         var list = new List<SessionHistoryEntry>();
         while (reader.Read())
-        {
-            list.Add(new SessionHistoryEntry
-            {
-                Id = reader.GetInt64(reader.GetOrdinal("id")),
-                UserId = reader.GetInt64(reader.GetOrdinal("user_id")),
-                Username = reader.GetString(reader.GetOrdinal("username")),
-                Ip = reader.GetString(reader.GetOrdinal("ip")),
-                Mac = reader.GetString(reader.GetOrdinal("mac")),
-                StartedUtc = FromDb(reader.GetString(reader.GetOrdinal("started_utc"))),
-                EndedUtc = FromDb(reader.GetString(reader.GetOrdinal("ended_utc"))),
-                DownloadBytes = reader.GetInt64(reader.GetOrdinal("download_bytes")),
-                UploadBytes = reader.GetInt64(reader.GetOrdinal("upload_bytes")),
-                EndReason = reader.GetString(reader.GetOrdinal("end_reason")),
-            });
-        }
+            list.Add(ReadHistory(reader));
         return list;
     }
 
@@ -350,6 +367,25 @@ public sealed class SqliteStore : IAccountStore
         AddColumnIfMissing(conn, "plans", "site_filter", "INTEGER NOT NULL DEFAULT 0");
         AddColumnIfMissing(conn, "plans", "site_list", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(conn, "plans", "use_proxy", "INTEGER NOT NULL DEFAULT 0");
+        AddColumnIfMissing(conn, "users", "usage_updated_utc", "TEXT NULL");
+
+        using (var box = conn.CreateCommand())
+        {
+            box.CommandText = """
+                CREATE TABLE IF NOT EXISTS webhook_outbox (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event TEXT NOT NULL,
+                    username TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    next_try_utc TEXT NOT NULL,
+                    created_utc TEXT NOT NULL,
+                    last_error TEXT NOT NULL DEFAULT ''
+                );
+                CREATE INDEX IF NOT EXISTS ix_webhook_due ON webhook_outbox(next_try_utc);
+                """;
+            box.ExecuteNonQuery();
+        }
 
         using var count = conn.CreateCommand();
         count.CommandText = "SELECT COUNT(*) FROM plans";
@@ -411,10 +447,72 @@ public sealed class SqliteStore : IAccountStore
             UsedUploadBytes = r.GetInt64(r.GetOrdinal("used_upload")),
             UsedSeconds = r.GetInt64(r.GetOrdinal("used_seconds")),
             FirstLoginUtc = r.IsDBNull(firstLogin) ? null : FromDb(r.GetString(firstLogin)),
+            UsageUpdatedUtc = r.IsDBNull(r.GetOrdinal("usage_updated_utc")) ? null : FromDb(r.GetString(r.GetOrdinal("usage_updated_utc"))),
             CreatedUtc = FromDb(r.GetString(r.GetOrdinal("created_utc"))),
             Notes = r.GetString(r.GetOrdinal("notes")),
         };
     }
+
+    private static SessionHistoryEntry ReadHistory(SqliteDataReader reader) => new()
+    {
+        Id = reader.GetInt64(reader.GetOrdinal("id")),
+        UserId = reader.GetInt64(reader.GetOrdinal("user_id")),
+        Username = reader.GetString(reader.GetOrdinal("username")),
+        Ip = reader.GetString(reader.GetOrdinal("ip")),
+        Mac = reader.GetString(reader.GetOrdinal("mac")),
+        StartedUtc = FromDb(reader.GetString(reader.GetOrdinal("started_utc"))),
+        EndedUtc = FromDb(reader.GetString(reader.GetOrdinal("ended_utc"))),
+        DownloadBytes = reader.GetInt64(reader.GetOrdinal("download_bytes")),
+        UploadBytes = reader.GetInt64(reader.GetOrdinal("upload_bytes")),
+        EndReason = reader.GetString(reader.GetOrdinal("end_reason")),
+    };
+
+    public void EnqueueWebhook(string eventName, string username, string payload, bool replaceSameUser)
+    {
+        using var conn = Open();
+        if (replaceSameUser)
+        {
+            using var del = conn.CreateCommand();
+            del.CommandText = "DELETE FROM webhook_outbox WHERE event = $e AND username = $u";
+            del.Parameters.AddWithValue("$e", eventName);
+            del.Parameters.AddWithValue("$u", username);
+            del.ExecuteNonQuery();
+        }
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = """
+            INSERT INTO webhook_outbox (event, username, payload, attempts, next_try_utc, created_utc, last_error)
+            VALUES ($e, $u, $p, 0, $n, $c, '')
+            """;
+        var now = ToDb(DateTime.UtcNow);
+        cmd.Parameters.AddWithValue("$e", eventName);
+        cmd.Parameters.AddWithValue("$u", username);
+        cmd.Parameters.AddWithValue("$p", payload);
+        cmd.Parameters.AddWithValue("$n", now);
+        cmd.Parameters.AddWithValue("$c", now);
+        cmd.ExecuteNonQuery();
+    }
+
+    public IReadOnlyList<(long Id, string Payload, int Attempts)> TakeDueWebhooks(int limit = 20)
+    {
+        using var conn = Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT id, payload, attempts FROM webhook_outbox WHERE next_try_utc <= $now ORDER BY id LIMIT $limit";
+        cmd.Parameters.AddWithValue("$now", ToDb(DateTime.UtcNow));
+        cmd.Parameters.AddWithValue("$limit", limit);
+        using var reader = cmd.ExecuteReader();
+        var list = new List<(long, string, int)>();
+        while (reader.Read())
+            list.Add((reader.GetInt64(0), reader.GetString(1), reader.GetInt32(2)));
+        return list;
+    }
+
+    public void DeleteWebhook(long id) =>
+        Execute("DELETE FROM webhook_outbox WHERE id = $id", ("$id", id));
+
+    public void RescheduleWebhook(long id, int attempts, DateTime nextUtc, string error) =>
+        Execute(
+            "UPDATE webhook_outbox SET attempts = $a, next_try_utc = $n, last_error = $e WHERE id = $id",
+            ("$a", attempts), ("$n", ToDb(nextUtc)), ("$e", error), ("$id", id));
 
     private static string ToDb(DateTime utc) => utc.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
 
